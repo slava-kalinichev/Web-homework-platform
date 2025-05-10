@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .submit-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .error-message {
+            color: #ff453a;
+            margin-bottom: 15px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 69, 58, 0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: rgba(100, 100, 110, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 30px;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .modal-btn {
+            margin-top: 20px;
+            background: rgba(10, 132, 255, 0.3);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Добавление ученика в класс {{ class_name }}</h1>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="addStudentForm">
+            <label for="student_login">Логин ученика:</label>
+            <input type="text" id="student_login" name="student_login" required>
+
+            <div class="submit-container">
+                <div class="button-group">
+                    <button type="submit" class="btn-vision btn-primary">Отправить заявку</button>
+                    <a href="{{ url_for('class_view', user_id=user_id, class_name=class_name) }}" class="btn-vision">Назад</a>
+                </div>
+
+                <div class="checkmark" id="checkmark">
+                    <svg viewBox="0 0 100 100">
+                        <path d="M20,50 L40,70 L80,30"/>
+                    </svg>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div id="successModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <p id="successMessage"></p>
+            <button class="modal-btn" onclick="document.getElementById('successModal').style.display = 'none'">OK</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('addStudentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const login = document.getElementById('student_login').value;
+            const classId = "{{ class_info.id }}";
+            const teacherId = "{{ teacher_id }}";
+            const className = "{{ class_name }}";
+            const isSchoolClass = "{{ is_school_class }}" === "True";
+
+            try {
+                // Проверяем возможность добавления
+                const response = await fetch(`/check_student_for_class?login=${encodeURIComponent(login)}&class_id=${classId}&is_school=${isSchoolClass}`);
+                const data = await response.json();
+
+                if (data.can_add) {
+                    // Отправляем заявку
+                    const formData = new FormData();
+                    formData.append('student_login', login);
+                    formData.append('class_id', classId);
+                    formData.append('teacher_id', teacherId);
+
+                    const addResponse = await fetch("{{ url_for('send_invitation', user_id=user_id, class_name=class_name) }}", {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await addResponse.json();
+
+                    if (result.success) {
+                        // Показываем сообщение
+                        alert(`Заявка на вступление в класс ${className} отправлена ${result.student_name}`);
+
+                        // Показываем анимацию галочки
+                        document.getElementById('checkmark').style.display = 'block';
+
+                        // Перенаправляем на class_view через 1 секунду
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('class_view', user_id=user_id, class_name=class_name) }}";
+                        }, 1000);
+                    } else {
+                        document.getElementById('errorMessage').textContent = result.message;
+                        document.getElementById('errorMessage').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('errorMessage').textContent = data.message;
+                    document.getElementById('errorMessage').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('errorMessage').textContent = 'Ошибка при отправке заявки';
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

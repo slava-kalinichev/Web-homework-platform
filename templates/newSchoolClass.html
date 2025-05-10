@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Добавить школьный класс</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 500px;
+            margin: 50px auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .error-message {
+            color: #ff453a;
+            margin-bottom: 15px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 69, 58, 0.1);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Добавление школьного класса</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="error-message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form id="schoolClassForm" method="POST" action="{{ url_for('new_school_class', user_id=user_id) }}">
+            <label for="class_name">Название класса:</label>
+            <input type="text" id="class_name" name="class_name" required>
+
+            <div class="button-group">
+                <button type="submit" class="btn-vision btn-primary">Создать</button>
+                <a href="{{ url_for('mainTeacher', user_id=user_id) }}" class="btn-vision">Отмена</a>
+
+                <div class="checkmark" id="checkmark">
+                    <svg viewBox="0 0 100 100">
+                        <path d="M20,50 L40,70 L80,30"/>
+                    </svg>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('schoolClassForm').addEventListener('submit', function(e) {
+            const className = document.getElementById('class_name').value;
+
+            fetch(`/check_class_name?name=${encodeURIComponent(className)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        alert('Класс с таким названием уже существует!');
+                    } else {
+                        document.getElementById('checkmark').style.display = 'block';
+                        setTimeout(() => {
+                            this.submit();
+                        }, 1000);
+                    }
+                });
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>

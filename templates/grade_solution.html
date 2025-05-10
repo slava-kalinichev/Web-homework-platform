@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .flex-container {
+            display: flex;
+            gap: 30px;
+        }
+
+        .main-content {
+            flex: 2;
+        }
+
+        .sidebar {
+            flex: 1;
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1, h2 {
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .student-info {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-label {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .task-text, .solution-text {
+            background: rgba(120, 120, 130, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+
+        .grading-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            align-items: center;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+        select#grade {
+            color: white;
+        }
+
+        select#grade option {
+            color: black !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="flex-container">
+        <div class="main-content">
+            <div class="glass-panel">
+                <h1>Решение от {{ solution.student_name.split()[0] }} {{ solution.student_name.split()[1][0] }}.</h1>
+                <h2>Оценка решения</h2>
+
+                <div class="student-info">
+                    <div class="info-label">Ученик:</div>
+                    <div>{{ solution.student_name }}</div>
+
+                    <div class="info-label">Предмет:</div>
+                    <div>{{ task.subject }}</div>
+
+                    <div class="info-label">Тема:</div>
+                    <div>{{ task.theme }}</div>
+
+                    <div class="info-label">Дедлайн:</div>
+                    <div>{{ solution.submission_date }}</div>
+                </div>
+
+                <div class="task-text">
+                    <strong>Текст задания:</strong>
+                    <p>{{ task.text }}</p>
+                </div>
+
+                <div class="solution-text">
+                    <strong>Решение ученика:</strong>
+                    <p>{{ solution.text }}</p>
+                    {% if has_file %}
+                    <div style="margin-top: 15px;">
+                        <a href="{{ url_for('download_solution_file', stid=solution_stid) }}"
+                           class="btn-vision"
+                           style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Скачать файл решения
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="grading-panel">
+                <h3>Оценить решение</h3>
+                <form id="gradingForm" method="POST" action="">
+                    <label for="grade">Оценка:</label>
+                    <select id="grade" name="grade" required>
+                        <option value="">Выберите оценку</option>
+                        <option value="незачёт">Незачёт</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+
+                    <label for="comment">Комментарий (до 100 символов):</label>
+                    <textarea id="comment" name="comment" maxlength="100" placeholder="Введите комментарий...">{{ solution.comment if solution.comment }}</textarea>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-vision btn-primary">Опубликовать оценку</button>
+                        <a href="{{ url_for('teacher_task_view', user_id=user_id, task_id=task.id) }}" class="btn-vision">Назад</a>
+
+                        <div class="checkmark" id="checkmark">
+                            <svg viewBox="0 0 100 100">
+                                <path d="M20,50 L40,70 L80,30"/>
+                            </svg>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('gradingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            document.getElementById('checkmark').style.display = 'block';
+            setTimeout(() => {
+                this.submit();
+            }, 1000);
+        });
+
+        // Установка текущей оценки, если она есть
+        {% if solution.grade %}
+        document.getElementById('grade').value = '{{ solution.grade }}';
+        {% endif %}
+    </script>
+</body>
+</html>

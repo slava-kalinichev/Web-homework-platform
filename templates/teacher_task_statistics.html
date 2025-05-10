@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin: 0;
+            color: #ffffff;
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: rgba(255,255,255,0.9);
+        }
+
+        h3 {
+            font-weight: 500;
+            margin: 25px 0 15px 0;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .task-info {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .info-label {
+            color: rgba(255,255,255,0.7);
+            font-size: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .task-details {
+            flex: 1;
+        }
+
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin-top: 20px;
+            width: 300px;
+        }
+
+        .charts-row {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .chart {
+            flex: 1;
+            text-align: center;
+        }
+
+        .pie-chart {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            position: relative;
+            background: conic-gradient(
+                var(--chart-colors)
+            );
+        }
+
+        .chart-value {
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .chart-label {
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+        }
+
+        .not-submitted {
+            margin-top: 20px;
+            color: white; /* Белый цвет текста */
+            font-size: 16px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(100, 100, 110, 0.2);
+            border-radius: 10px;
+        }
+
+        .status-completed {
+            color: #30d158;
+            background: rgba(48, 209, 88, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status-failed {
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status-not-submitted {
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <div class="header-container">
+            <h1>Статистика выполнения "{{ task.subject }}"</h1>
+            <a href="{{ url_for('teacher_task_view', user_id=user_id, task_id=task.id) }}" class="btn-vision">← Назад к заданию</a>
+        </div>
+
+        <div class="stats-container">
+            <div class="task-details">
+                <div class="task-info">
+                    <div class="info-label">Тема:</div>
+                    <div>{{ task.theme }}</div>
+
+                    <div class="info-label">Класс:</div>
+                    <div>{{ task.class_name }}</div>
+
+                    <div class="info-label">Дедлайн:</div>
+                    <div>{{ task.deadline }}</div>
+
+                    <div class="info-label">Текст задания:</div>
+                    <div>{{ task.text }}</div>
+                </div>
+
+                <h3>Выполнение в классе</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Фамилия</th>
+                            <th>Имя</th>
+                            <th>Оценка</th>
+                            <th>Логин</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td>{{ student['LastName'] }}</td>
+                            <td>{{ student['FirstName'] }}</td>
+                            <td>
+                                {% if student['grade'] %}
+                                    {% if student['grade'] == 'незачёт' %}
+                                        <span class="status-failed">{{ student['grade'] }}</span>
+                                    {% else %}
+                                        <span class="status-completed">{{ student['grade'] }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="status-not-submitted">Не выполнено</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ student['Login'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="charts-container">
+                <div class="charts-row">
+                    <div class="chart">
+                        <div class="pie-chart" id="completedChart"></div>
+                        <div class="chart-value">{{ stats.completed }} из {{ stats.total }}</div>
+                        <div class="chart-label">Выполнили (3,4,5)</div>
+                    </div>
+                    <div class="chart">
+                        <div class="pie-chart" id="failedChart"></div>
+                        <div class="chart-value">{{ stats.failed }} из {{ stats.total }}</div>
+                        <div class="chart-label">Незачёт</div>
+                    </div>
+                </div>
+                <div class="not-submitted">
+                    Не отправили решение: {{ stats.not_submitted }} ученик{% if stats.not_submitted != 1 %}а{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const completedPercent = {{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }};
+            const failedPercent = {{ (stats.failed / stats.total * 100) if stats.total > 0 else 0 }};
+
+            // Диаграмма выполненных заданий
+            const completedChart = document.getElementById('completedChart');
+            completedChart.style.background = `conic-gradient(
+                #30d158 0% ${completedPercent}%,
+                rgba(100, 100, 110, 0.3) ${completedPercent}% 100%
+            )`;
+
+            // Диаграмма незачетов
+            const failedChart = document.getElementById('failedChart');
+            failedChart.style.background = `conic-gradient(
+                #ff453a 0% ${failedPercent}%,
+                rgba(100, 100, 110, 0.3) ${failedPercent}% 100%
+            )`;
+        });
+    </script>
+</body>
+</html>

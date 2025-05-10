@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 500px;
+            margin: 50px auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .role-switcher {
+            display: flex;
+            margin: 20px 0;
+            background: rgba(120, 120, 130, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .role-option {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .role-option.selected {
+            background: rgba(10, 132, 255, 0.3);
+            font-weight: 500;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            text-align: center;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .checkmark {
+            width: 50px;
+            height: 50px;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1.5s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .error-message {
+            color: #ff453a;
+            margin-bottom: 15px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Введите свои данные</h1>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="regForm" method="POST" action="{{ url_for('register') }}">
+            <input type="text" id="lastName" name="lastName" placeholder="Фамилия" required>
+            <input type="text" id="firstName" name="firstName" placeholder="Имя" required>
+            <input type="text" id="middleName" name="middleName" placeholder="Отчество">
+
+            <input type="hidden" id="role" name="role" value="">
+            <div class="role-switcher">
+                <div class="role-option" onclick="selectRole(this, 'student')">Ученик</div>
+                <div class="role-option" onclick="selectRole(this, 'teacher')">Учитель</div>
+            </div>
+
+            <input type="text" id="login" name="login" placeholder="Логин" required>
+            <input type="password" id="password" name="password" placeholder="Пароль" required>
+
+            <div class="checkmark" id="checkmark">
+                <svg viewBox="0 0 100 100">
+                    <path d="M20,50 L40,70 L80,30"/>
+                </svg>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" id="submitBtn" class="btn-vision btn-primary" disabled>Подтвердить</button>
+                <a href="/index" class="btn-vision">Назад</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let selectedRole = null;
+
+        function selectRole(element, role) {
+            document.querySelectorAll('.role-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            selectedRole = role;
+            document.getElementById('role').value = role;
+            validateForm();
+        }
+
+        function validateForm() {
+            const inputs = document.querySelectorAll('input[required]');
+            let isValid = true;
+
+            inputs.forEach(input => {
+                if (!input.value) isValid = false;
+            });
+
+            document.getElementById('submitBtn').disabled = !isValid || !selectedRole;
+        }
+
+        // Обработчики изменения для всех обязательных полей
+        document.querySelectorAll('input[required]').forEach(input => {
+            input.addEventListener('input', validateForm);
+        });
+
+        document.getElementById('regForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // Показываем анимацию
+            const checkmark = document.getElementById('checkmark');
+            checkmark.style.display = 'block';
+
+            // Блокируем кнопку
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Отправка...';
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        lastName: document.getElementById('lastName').value,
+                        firstName: document.getElementById('firstName').value,
+                        middleName: document.getElementById('middleName').value,
+                        role: document.getElementById('role').value,
+                        login: document.getElementById('login').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/index';
+                    }, 2000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                checkmark.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Подтвердить';
+                alert(error.message);
+            }
+        });
+    </script>
+</body>
+</html>

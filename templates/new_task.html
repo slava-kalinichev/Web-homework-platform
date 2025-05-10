@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Публикация задания</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px; /* Основной отступ как в class_view */
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+            margin-top: 20px; /* Дополнительный отступ сверху как в class_view */
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 40px;
+        }
+
+        .form-column {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-column:first-child {
+            width: 300px;
+        }
+
+        .form-column:last-child {
+            flex: 1;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            max-width: 250px;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(120, 120, 130, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            height: 180px;
+            min-height: 180px;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: auto;
+            padding-top: 15px;
+            align-items: center;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .file-upload {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            background: rgba(10, 132, 255, 0.3);
+            border-radius: 10px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            max-width: 150px;
+        }
+
+        .file-label:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .file-name {
+            margin-left: 15px;
+            color: rgba(255,255,255,0.7);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+
+            .form-row {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .form-column:first-child {
+                width: 100%;
+            }
+
+            input, select {
+                max-width: 100%;
+            }
+
+            textarea {
+                height: 150px;
+                min-height: 150px;
+            }
+        }
+        #removeFileBtn {
+        background: none;
+        border: none;
+        color: #ff453a;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.3s;
+    }
+
+    #removeFileBtn:hover {
+        background-color: rgba(255, 69, 58, 0.1);
+    }
+
+    #removeFileBtn svg {
+        width: 14px;
+        height: 14px;
+    }
+    select#class_name, select#subject {
+        color: white;
+    }
+
+    select#class_name option, select#subject option {
+        color: black !important;
+    }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Публикация задания</h1>
+        <p>Заполните данные</p>
+
+        <form id="taskForm" method="POST" action="{{ url_for('new_task', user_id=user_id) }}" enctype="multipart/form-data">
+            <div class="form-row">
+                <div class="form-column">
+                    <div class="form-group">
+                        <label for="class_name">Класс:</label>
+                        <select id="class_name" name="class_name" required>
+                            <option value="">Выберите класс</option>
+                            {% for class in classes %}
+                            <option value="{{ class.name }}">{{ class.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subject">Предмет:</label>
+                        <input type="text" id="subject" name="subject" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="theme">Тема задания:</label>
+                        <input type="text" id="theme" name="theme" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deadline">Дедлайн:</label>
+                        <input type="date" id="deadline" name="deadline" required>
+                    </div>
+                </div>
+
+                <div class="form-column">
+                    <div class="form-group">
+                        <label for="task_text">Введите задание:</label>
+                        <textarea id="task_text" name="task_text" required></textarea>
+                    </div>
+
+                    <div class="file-upload">
+                        <label for="fileInput" class="file-label">Прикрепить файл</label>
+                        <input type="file" id="fileInput" name="file" class="file-input">
+                        <div id="fileDisplay" style="display: flex; align-items: center; gap: 10px;">
+                            <span id="fileName" class="file-name">Файл не выбран</span>
+                            <button type="button" id="removeFileBtn" style="display: none; background: none; border: none; color: #ff453a; cursor: pointer;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-vision btn-primary">Опубликовать</button>
+                        <a href="{{ url_for('mainTeacher', user_id=user_id) }}" class="btn-vision">Назад</a>
+                        <div class="checkmark" id="checkmark">
+                            <svg viewBox="0 0 100 100">
+                                <path d="M20,50 L40,70 L80,30"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'Файл не выбран';
+            document.getElementById('fileName').textContent = fileName;
+            document.getElementById('removeFileBtn').style.display = fileName !== 'Файл не выбран' ? 'block' : 'none';
+        });
+
+        document.getElementById('removeFileBtn').addEventListener('click', function() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileName').textContent = 'Файл не выбран';
+            this.style.display = 'none';
+        });
+
+        // Обработка отправки формы
+        document.getElementById('taskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Получаем введенную дату
+            const deadlineInput = document.getElementById('deadline');
+            const deadlineDate = new Date(deadlineInput.value);
+
+            deadlineDate.setDate(deadlineDate.getDate() + 1);
+
+            // Форматируем обратно в YYYY-MM-DD
+            const correctedDate = deadlineDate.toISOString().split('T')[0];
+
+            // Создаем скрытое поле для отправки скорректированной даты
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'corrected_deadline';
+            hiddenInput.value = correctedDate;
+            this.appendChild(hiddenInput);
+
+            // Показываем анимацию и отправляем форму
+            document.getElementById('checkmark').style.display = 'block';
+            setTimeout(() => {
+                this.submit();
+            }, 1000);
+        });
+
+        // Отображение имени выбранного файла
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'Файл не выбран';
+            document.getElementById('fileName').textContent = fileName;
+        });
+    </script>
+</body>
+</html>

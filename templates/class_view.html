@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            font-weight: 500;
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 25px 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .btn-danger {
+            background: rgba(255, 59, 48, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 59, 48, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+            margin-left: 15px;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .grade-cell {
+            font-weight: 500;
+        }
+        .grade-A {
+            color: #30d158; /* Зеленый для отличных оценок */
+        }
+        .grade-B {
+            color: #ffff00; /* Салатовый для хороших оценок */
+        }
+        .grade-C {
+            color: #ff9500; /* Оранжевый для средних оценок */
+        }
+        .grade-D {
+            color: #ff3b30; /* Красный для плохих оценок */
+        }
+        .grade-F {
+            color: #ffffff; /* Белый для плохих оценок */
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Класс {{ class_name }}</h1>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Фамилия</th>
+                    <th>Имя</th>
+                    <th>Отчество</th>
+                    <th>Логин</th>
+                    <th style="text-align: center;">Успеваемость</th>
+                </tr>
+            </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr onclick="window.location.href='{{ url_for('student_view', user_id=user_id, class_name=class_name, student_id=student.id) }}'">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ student.name.split()[0] }}</td>
+                        <td>{{ student.name.split()[1] }}</td>
+                        <td>{{ student.name.split()[2][0] if student.name.split()|length > 2 else '' }}.</td>
+                        <td>{{ student.login }}</td>
+                        <td class="grade-cell
+                            {% if student.average_grade >= 4.5 %}grade-A
+                            {% elif student.average_grade >= 3.5 %}grade-B
+                            {% elif student.average_grade >= 2.5 %}grade-C
+                            {% elif student.average_grade > 0 %}grade-D
+                            {% else %}grade-F{% endif %}"
+                            style="text-align: center;">
+                            {% if student.average_grade > 0 %}{{ "%.1f"|format(student.average_grade) }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <div class="button-group">
+            <a href="{{ url_for('add_student', user_id=user_id, class_name=class_name) }}?class_id={{ class_id }}" class="btn-vision btn-primary">Добавить ученика</a>
+            <button type="button" onclick="confirmDeleteClass()" class="btn-vision btn-danger">Удалить класс</button>
+            <a href="{{ url_for('mainTeacher', user_id=user_id) }}" class="btn-vision">Назад</a>
+
+            <div class="checkmark" id="checkmark">
+                <svg viewBox="0 0 100 100">
+                    <path d="M20,50 L40,70 L80,30"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmDeleteClass() {
+            if (confirm(`Вы действительно хотите удалить класс {{ class_name }}?`)) {
+                // Добавляем class_id в URL для точного указания класса
+                const deleteUrl = '{{ url_for("delete_class", user_id=user_id, class_name=class_name) }}?class_id={{ class_id }}';
+
+                document.getElementById('checkmark').style.display = 'block';
+                setTimeout(() => {
+                    window.location.href = deleteUrl;
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

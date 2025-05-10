@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        .student-info {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-label {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            margin: 25px 0;
+        }
+
+        .stat-item {
+            background: rgba(120, 120, 130, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 25px 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(255, 59, 48, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 59, 48, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Ученик {{ student.name.split()[0] }} {{ student.name.split()[1][0] }}.</h1>
+
+        <div class="student-info">
+            <div class="info-label">Фамилия:</div>
+            <div>{{ student.name.split()[0] }}</div>
+
+            <div class="info-label">Имя:</div>
+            <div>{{ student.name.split()[1] }}</div>
+
+            <div class="info-label">Отчество:</div>
+            <div>{{ student.name.split()[2] if student.name.split()|length > 2 else 'Нет' }}</div>
+
+            <div class="info-label">Логин:</div>
+            <div>{{ student.login }}</div>
+
+            <div class="info-label">Класс:</div>
+            <div>{{ class_name }}</div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value">{{ class_stats.completed_tasks }}/{{ class_stats.total_tasks }}</div>
+                <div class="stat-label">Выполнено заданий</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">
+                    {% if class_stats.total_tasks > 0 %}
+                        {{ (class_stats.completed_tasks / class_stats.total_tasks * 100)|round(1) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+                <div class="stat-label">Процент выполнения</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">
+                    {% if class_stats.average_grade > 0 %}
+                        {{ "%.1f"|format(class_stats.average_grade) }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </div>
+                <div class="stat-label">Средняя оценка</div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="button-group">
+            <button type="button" onclick="deleteStudent()" class="btn-vision btn-danger">Удалить ученика</button>
+            <a href="{{ url_for('class_view', user_id=user_id, class_name=class_name) }}" class="btn-vision">Назад</a>
+
+            <div class="checkmark" id="checkmark">
+                <svg viewBox="0 0 100 100">
+                    <path d="M20,50 L40,70 L80,30"/>
+                </svg>
+            </div>
+        </div>
+
+        <form id="deleteForm" method="POST" action="{{ url_for('delete_student', user_id=user_id, class_name=class_name, student_id=student.id) }}" style="display: none;"></form>
+    </div>
+
+    <script>
+        function deleteStudent() {
+            if (confirm(`Вы действительно хотите удалить ученика {{ student.name.split()[0] }} {{ student.name.split()[1][0] }}.?`)) {
+                document.getElementById('checkmark').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('deleteForm').submit();
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

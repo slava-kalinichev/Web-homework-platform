@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .main-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .classes-column {
+            flex: 0 0 35%;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .tasks-column {
+            flex: 1;
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            font-weight: 500;
+            margin-bottom: 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0 0 0;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 10px 20px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(10, 132, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .class-link {
+            color: #0a84ff;
+            text-decoration: none;
+            display: block;
+            padding: 12px 15px;
+        }
+
+        .class-link:hover {
+            text-decoration: underline;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .status-pending {
+            background: rgba(255, 159, 10, 0.2);
+            color: #ff9f0a;
+            border-radius: 10px;
+            display: inline-block;
+            vertical-align: middle;
+            white-space: nowrap;
+            padding: 4px 10px;
+            font-size: 13px;
+        }
+
+        .status-completed {
+            background: rgba(48, 209, 88, 0.2);
+            color: #30d158;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 10px 20px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .logout-btn:hover {
+            background: rgba(150, 150, 160, 0.4);
+        }
+
+        .error-message {
+            color: #ffffff;
+            background: rgba(37, 91, 156, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .close-error {
+            cursor: pointer;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+
+        /* Новые стили для статусов заявок */
+        .invitation-status-panel {
+            background: rgba(10, 132, 255, 0.1);
+            border-left: 4px solid #0a84ff;
+            margin-bottom: 30px;
+        }
+
+        .invitation-status-item {
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .invitation-status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-accepted {
+            color: #30d158;
+        }
+
+        .status-rejected {
+            color: #ff453a;
+        }
+        .invitation-notification {
+            background: rgba(10, 132, 255, 0.2);
+            border-left: 4px solid #0a84ff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            transition: opacity 0.5s ease;
+        }
+        a {
+            color: #ffffff !important;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        a:hover {
+            color: #c2e4ff !important;
+            text-decoration: underline;
+        }
+
+        /* Специфичные стили */
+        .class-link {
+            color: #ffffff !important;
+        }
+
+        .task-title {
+            color: #ffffff !important;
+        }
+
+        /* Модальное окно фильтрации и сортировки */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+        }
+
+        .modal-content {
+            background: rgba(50, 50, 60, 0.95);
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            width: 450px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .close-modal {
+            color: #aaa;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .form-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-confirm {
+            background: rgba(10, 132, 255, 0.3);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .btn-reset {
+            background: rgba(255, 69, 58, 0.3);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .btn-confirm:hover {
+            background: rgba(10, 132, 255, 0.5);
+        }
+
+        .btn-reset:hover {
+            background: rgba(255, 69, 58, 0.5);
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .checkbox-container input {
+            margin-right: 10px;
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+        }
+        .modal-content select.form-select {
+            color: white !important; /* Цвет выбранного значения */
+        }
+
+        .modal-content select.form-select option {
+            color: black !important; /* Цвет элементов в выпадающем списке */
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <a href="/index" class="logout-btn">Выйти</a>
+
+        <h1>Учитель: {{ userName }}</h1>
+        <h3>Добро пожаловать в Smartable LMS!</h3>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="error-message">
+                        <span>{{ message }}</span>
+                        <span class="close-error" onclick="this.parentElement.style.display='none'">×</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if last_invitation_status %}
+        <div class="invitation-notification" id="invitationNotification">
+            Ученик {{ last_invitation_status.student_name }}
+            {% if last_invitation_status.status == 'accepted' %}
+            принял приглашение в класс "{{ last_invitation_status.class_name }}"
+            {% else %}
+            отклонил приглашение в класс "{{ last_invitation_status.class_name }}"
+            {% endif %}
+        </div>
+
+        <script>
+            // Автоматически скрываем уведомление через 5 секунд
+            setTimeout(() => {
+                const notification = document.getElementById('invitationNotification');
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 500);
+            }, 5000);
+        </script>
+        {% endif %}
+
+        <!-- Панель статусов заявок -->
+        {% if invitation_statuses %}
+        <div class="glass-panel invitation-status-panel">
+            <h3>Статусы заявок</h3>
+            {% for status in invitation_statuses %}
+            <div class="invitation-status-item">
+                Ученик {{ status.student_name }}
+                <span class="{% if status.Status == 'accepted' %}status-accepted{% else %}status-rejected{% endif %}">
+                    {% if status.Status == 'accepted' %}
+                    принял заявку в класс "{{ status.class_name }}"
+                    {% else %}
+                    отклонил заявку в класс "{{ status.class_name }}"
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="main-container">
+            <div class="classes-column">
+                <!-- Школьные классы -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <b>Классы школы {% if school_name %} {{ school_name }}{% endif %}</b>
+                        {% if is_school_teacher %}
+                            <a href="{{ url_for('new_school_class', user_id=user_id) }}" class="btn-vision">
+                                Добавить класс
+                            </a>
+                        {% endif %}
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Наименование класса</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if school_classes %}
+                                {% for class in school_classes %}
+                                <tr onclick="window.location.href='{{ url_for('class_view', user_id=user_id, class_name=class.name) }}'">
+                                    <td><a href="{{ url_for('class_view', user_id=user_id, class_name=class.name) }}" class="class-link">{{ class.name }}</a></td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td class="empty-message">Нет классов</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Персональные классы -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <b>Мои классы</b>
+                        <a href="{{ url_for('new_my_class', user_id=user_id) }}" class="btn-vision">
+                            Добавить класс
+                        </a>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Наименование класса</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if my_classes %}
+                                {% for class in my_classes %}
+                                <tr onclick="window.location.href='{{ url_for('class_view', user_id=user_id, class_name=class.name) }}'">
+                                    <td><a href="{{ url_for('class_view', user_id=user_id, class_name=class.name) }}" class="class-link">{{ class.name }}</a></td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td class="empty-message">Нет классов</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Задания -->
+            <div class="tasks-column">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <b>Задания</b>
+                        <a href="{{ url_for('new_task', user_id=user_id) }}" class="btn-vision btn-primary">Новое задание</a>
+                    </div>
+                    <table id="tasksTable">
+                        <thead id="tasksTableHeader">
+                            <tr>
+                                <th>Дата</th>
+                                <th>Класс</th>
+                                <th>Предмет</th>
+                                <th>Тема задания</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasksTableBody">
+                            {% if tasks %}
+                                {% for task in tasks %}
+                                <tr onclick="window.location.href='{{ url_for('teacher_task_view', user_id=user_id, task_id=task.id) }}'">
+                                    <td>{{ task.date if task.date else "Нет даты" }}</td>
+                                    <td>{{ task.class_name }}</td>
+                                    <td>{{ task.subject }}</td>
+                                    <td><a href="{{ url_for('teacher_task_view', user_id=user_id, task_id=task.id) }}" style="color: #0a84ff; text-decoration: none;">{{ task.theme }}</a></td>
+                                    <td>
+                                        {% if task.pending_count > 0 %}
+                                            <span class="status-pending">Ждёт проверки ({{ task.pending_count }})</span>
+                                        {% elif is_deadline_passed(task.deadline_unix) %}
+                                            <span class="status-completed">Завершено</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="empty-message">Нет заданий</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно фильтрации и сортировки -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Фильтр и сортировка заданий</span>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Фильтр по:</label>
+                <select id="filterBy" class="form-select">
+                    <option value="">Не фильтровать</option>
+                    <option value="0">Дата</option>
+                    <option value="1">Класс</option>
+                    <option value="2">Предмет</option>
+                    <option value="3">Тема задания</option>
+                    <option value="4">Статус</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Фильтр:</label>
+                <select id="filterValue" class="form-select" disabled>
+                    <option value="">Выберите значение</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Сортировка по:</label>
+                <select id="sortBy" class="form-select">
+                    <option value="">Не сортировать</option>
+                    <option value="0">Дата</option>
+                    <option value="1">Класс</option>
+                    <option value="2">Предмет</option>
+                    <option value="3">Тема задания</option>
+                    <option value="4">Статус</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Сортировка:</label>
+                <select id="sortOrder" class="form-select">
+                    <option value="asc">По возрастанию</option>
+                    <option value="desc">По убыванию</option>
+                </select>
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="includeCompleted">
+                <label for="includeCompleted" class="checkbox-label">Учитывать завершенные задания</label>
+            </div>
+            <div class="form-buttons">
+                <button id="resetFilters" class="btn-reset">Сбросить</button>
+                <button id="applyFilters" class="btn-confirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Добавляем анимации при наведении
+        document.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-2px)';
+                this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+            });
+
+            row.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+                this.style.boxShadow = '';
+            });
+        });
+
+        // Автоматическое скрытие сообщений об ошибках через 5 секунд
+        setTimeout(() => {
+            document.querySelectorAll('.error-message').forEach(msg => {
+                msg.style.display = 'none';
+            });
+        }, 5000);
+
+        // Автоматическое скрытие уведомлений о статусах заявок через 5 секунд
+        setTimeout(() => {
+            document.querySelectorAll('.invitation-status-panel').forEach(panel => {
+                panel.style.opacity = '0';
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                }, 500);
+            });
+        }, 5000);
+
+        // Модальное окно фильтрации и сортировки
+        const modal = document.getElementById('filterModal');
+        const tasksTableHeader = document.getElementById('tasksTableHeader');
+        const filterBy = document.getElementById('filterBy');
+        const filterValue = document.getElementById('filterValue');
+        const sortBy = document.getElementById('sortBy');
+        const sortOrder = document.getElementById('sortOrder');
+        const includeCompleted = document.getElementById('includeCompleted');
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const resetFiltersBtn = document.getElementById('resetFilters');
+        const closeModalBtn = document.querySelector('.close-modal');
+
+        // Сохраняем оригинальные данные таблицы для сброса
+        const originalTableBody = document.getElementById('tasksTableBody').innerHTML;
+
+        // Показываем модальное окно при клике на шапку таблицы заданий
+        tasksTableHeader.addEventListener('click', function() {
+            modal.style.display = 'block';
+            updateFilterValues();
+        });
+
+        // Закрываем модальное окно при клике на крестик
+        closeModalBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+
+        // Закрываем модальное окно при клике вне его
+        window.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Обновляем значения фильтра при изменении поля "Фильтр по:"
+        filterBy.addEventListener('change', function() {
+            updateFilterValues();
+        });
+
+        // Функция для обновления значений в выпадающем списке фильтра
+        function updateFilterValues() {
+            const columnIndex = filterBy.value;
+            filterValue.innerHTML = '<option value="">Выберите значение</option>';
+
+            if (columnIndex === '') {
+                filterValue.disabled = true;
+                return;
+            }
+
+            filterValue.disabled = false;
+
+            const tasksTable = document.getElementById('tasksTable');
+            const rows = tasksTable.querySelectorAll('tbody tr');
+            const values = new Set();
+
+            rows.forEach(row => {
+                const cells = row.cells;
+                let value = '';
+
+                if (columnIndex == 4) { // Статус
+                    const statusElement = cells[columnIndex].querySelector('span');
+                    value = statusElement ? statusElement.textContent.trim() : '';
+                } else {
+                    value = cells[columnIndex].textContent.trim();
+                }
+
+                if (value) {
+                    values.add(value);
+                }
+            });
+
+            // Сортировка значений для выпадающего списка
+            const sortedValues = Array.from(values).sort((a, b) => {
+                // Для числовых значений в названиях классов
+                if (columnIndex == 1) { // Класс
+                    const partsA = a.split(/(\d+)/);
+                    const partsB = b.split(/(\d+)/);
+
+                    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                        const partA = partsA[i] || '';
+                        const partB = partsB[i] || '';
+
+                        if (i % 2 === 1) { // Числовая часть
+                            const numA = parseInt(partA) || 0;
+                            const numB = parseInt(partB) || 0;
+                            if (numA !== numB) return numA - numB;
+                        } else { // Текстовая часть
+                            if (partA !== partB) return partA.localeCompare(partB);
+                        }
+                    }
+                    return 0;
+                }
+                return a.localeCompare(b);
+            });
+
+            sortedValues.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                filterValue.appendChild(option);
+            });
+        }
+
+        function naturalSort(a, b) {
+            const ax = [], bx = [];
+
+            a.replace(/(\d+)|(\D+)/g, function(_, $1, $2) { ax.push([$1 || Infinity, $2 || ""]) });
+            b.replace(/(\d+)|(\D+)/g, function(_, $1, $2) { bx.push([$1 || Infinity, $2 || ""]) });
+
+            while(ax.length && bx.length) {
+                const an = ax.shift();
+                const bn = bx.shift();
+                const nn = (an[0] - bn[0]) || an[1].localeCompare(bn[1]);
+                if(nn) return nn;
+            }
+
+            return ax.length - bx.length;
+        }
+
+        // Применяем фильтры и сортировку
+        applyFiltersBtn.addEventListener('click', function() {
+            const columnIndex = filterBy.value;
+            const filterVal = filterValue.value;
+            const sortColumnIndex = sortBy.value;
+            const sortOrderVal = sortOrder.value;
+            const includeCompletedVal = includeCompleted.checked;
+
+            const tasksTable = document.getElementById('tasksTable');
+            const rows = Array.from(tasksTable.querySelectorAll('tbody tr'));
+
+            // Фильтрация (учитывает все задания независимо от статуса)
+            let filteredRows = rows;
+            if (columnIndex !== '' && filterVal !== '') {
+                filteredRows = rows.filter(row => {
+                    const cells = row.cells;
+                    let cellValue = '';
+
+                    if (columnIndex == 4) { // Статус
+                        const statusElement = cells[columnIndex].querySelector('span');
+                        cellValue = statusElement ? statusElement.textContent.trim() : '';
+                    } else {
+                        cellValue = cells[columnIndex].textContent.trim();
+                    }
+
+                    return cellValue === filterVal;
+                });
+            }
+
+            // Разделение на завершенные и незавершенные задания
+            let completedRows = [];
+            let notCompletedRows = [];
+
+            if (!includeCompletedVal) {
+                filteredRows.forEach(row => {
+                    const statusElement = row.cells[4].querySelector('span');
+                    const status = statusElement ? statusElement.textContent.trim() : '';
+
+                    if (status.includes('Завершено')) {
+                        completedRows.push(row);
+                    } else {
+                        notCompletedRows.push(row);
+                    }
+                });
+            } else {
+                notCompletedRows = filteredRows;
+            }
+
+            // Сортировка незавершенных заданий
+            if (sortColumnIndex !== '') {
+                notCompletedRows.sort((a, b) => {
+                    const aCells = a.cells;
+                    const bCells = b.cells;
+                    let aValue = '';
+                    let bValue = '';
+
+                    if (sortColumnIndex == 4) { // Статус
+                        const aStatusElement = aCells[sortColumnIndex].querySelector('span');
+                        const bStatusElement = bCells[sortColumnIndex].querySelector('span');
+                        aValue = aStatusElement ? aStatusElement.textContent.trim() : '';
+                        bValue = bStatusElement ? bStatusElement.textContent.trim() : '';
+                    } else {
+                        aValue = aCells[sortColumnIndex].textContent.trim();
+                        bValue = bCells[sortColumnIndex].textContent.trim();
+                    }
+
+                    // Специальная сортировка для классов (естественная сортировка)
+                    if (sortColumnIndex == 1) { // Класс
+                        return sortOrderVal === 'asc'
+                            ? naturalSort(aValue, bValue)
+                            : naturalSort(bValue, aValue);
+                    }
+
+                    return sortOrderVal === 'asc'
+                        ? aValue.localeCompare(bValue)
+                        : bValue.localeCompare(aValue);
+                });
+            }
+
+            // Обновляем таблицу
+            const tbody = tasksTable.querySelector('tbody');
+            tbody.innerHTML = '';
+
+            if (notCompletedRows.length === 0 && completedRows.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="5" class="empty-message">Нет заданий, соответствующих фильтру</td>';
+                tbody.appendChild(tr);
+            } else {
+                // Добавляем сначала незавершенные задания
+                notCompletedRows.forEach(row => {
+                    tbody.appendChild(row);
+                });
+
+                // Затем добавляем завершенные задания (если не включены в сортировку)
+                if (!includeCompletedVal) {
+                    completedRows.forEach(row => {
+                        tbody.appendChild(row);
+                    });
+                }
+            }
+
+            modal.style.display = 'none';
+        });
+
+        // Сброс фильтров
+        resetFiltersBtn.addEventListener('click', function() {
+            filterBy.value = '';
+            filterValue.value = '';
+            filterValue.disabled = true;
+            sortBy.value = '';
+            sortOrder.value = 'asc';
+            includeCompleted.checked = false;
+
+            // Восстанавливаем оригинальное состояние таблицы
+            document.getElementById('tasksTableBody').innerHTML = originalTableBody;
+
+            modal.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

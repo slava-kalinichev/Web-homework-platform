@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin: 0;
+            color: #ffffff;
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: rgba(255,255,255,0.9);
+        }
+
+        h3 {
+            font-weight: 500;
+            margin: 25px 0 15px 0;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .task-info {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .info-label {
+            color: rgba(255,255,255,0.7);
+            font-size: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .btn-vision:hover {
+            background: rgba(150, 150, 160, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(255, 69, 58, 0.3);
+            border: 1px solid rgba(255, 69, 58, 0.5);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 69, 58, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(120, 120, 130, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(150, 150, 160, 0.3);
+        }
+
+        .status-pending {
+            color: #ff9f0a;
+            background: rgba(255, 159, 10, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status-completed {
+            color: #30d158;
+            background: rgba(48, 209, 88, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status-not-submitted {
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.1);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .no-solutions {
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            padding: 20px;
+        }
+
+        .checkmark {
+            width: 100px;
+            height: 100px;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: none;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <div class="header-container">
+            <h1>Задание "{{ task.subject }}"</h1>
+            <div class="header-buttons">
+                <button onclick="confirmDeleteTask()"
+                        class="btn-vision btn-danger">Удалить задание</button>
+                <button onclick="window.location.href='{{ url_for('teacher_task_statistics', user_id=user_id, task_id=task.id) }}'"
+                        class="btn-vision btn-secondary">Статистика</button>
+                <button onclick="window.location.href='{{ url_for('mainTeacher', user_id=user_id) }}'"
+                        class="btn-vision">Назад в кабинет</button>
+            </div>
+        </div>
+
+        <div class="task-info">
+            <div class="info-label">Тема:</div>
+            <div>{{ task.theme }}</div>
+
+            <div class="info-label">Класс:</div>
+            <div>{{ task.class_name }}</div>
+
+            <div class="info-label">Дедлайн:</div>
+            <div>{{ task.deadline }}</div>
+
+            <div class="info-label">Текст задания:</div>
+            <div>{{ task.text }}</div>
+        </div>
+
+        <h3>Отправленные решения</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ученик</th>
+                    <th>Дата отправки</th>
+                    <th>Оценка</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solution in solutions %}
+                <tr onclick="window.location.href='{{ url_for('grade_solution', user_id=user_id, task_id=task.id, student_id=solution.student_id) }}'">
+                    <td>{{ solution.student_name }}</td>
+                    <td>{{ solution.submission_date }}</td>
+                    <td>{{ solution.grade if solution.grade else '—' }}</td>
+                    <td>
+                        <span class="{% if solution.grade %}status-completed{% else %}status-pending{% endif %}">
+                            {% if solution.grade %}Проверено{% else %}На проверке{% endif %}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="no-solutions">Нет отправленных решений</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="checkmark" id="checkmark">
+        <svg viewBox="0 0 100 100">
+            <path d="M20,50 L40,70 L80,30"/>
+        </svg>
+    </div>
+
+    <script>
+        function confirmDeleteTask() {
+            if (confirm(`Вы действительно хотите удалить задание "{{ task.subject }} - {{ task.theme }}"?`)) {
+                document.getElementById('checkmark').style.display = 'block';
+
+                fetch("{{ url_for('delete_task', user_id=user_id, task_id=task.id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('mainTeacher', user_id=user_id) }}";
+                        }, 1000);
+                    } else {
+                        alert('Ошибка при удалении задания');
+                        document.getElementById('checkmark').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ошибка при удалении задания');
+                    document.getElementById('checkmark').style.display = 'none';
+                });
+            }
+        }
+    </script>
+</body>
+</html>

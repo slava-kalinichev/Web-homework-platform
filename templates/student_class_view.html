@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @font-face {
+            font-family: 'SF Pro';
+            src: url('https://fonts.cdnfonts.com/css/sf-pro-display');
+        }
+
+        body {
+            font-family: 'SF Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: rgba(100, 100, 110, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            font-weight: 500;
+            margin: 25px 0 15px 0;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .teacher-info {
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(120, 120, 130, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 150px;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 40px;
+            align-items: center;
+        }
+
+        .btn-vision {
+            background: rgba(120, 120, 130, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            padding: 12px 24px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-danger {
+            background: rgba(255, 59, 48, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 59, 48, 0.5);
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            display: none;
+            margin-left: 15px;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h1>Мой класс {{ class_name }}</h1>
+
+        <div class="teacher-info">
+            Учитель: {{ teacher.LastName }} {{ teacher.FirstName }} {{ teacher.MiddleName }}
+        </div>
+
+        <h2>Статистика обучения</h2>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.completed_tasks if stats.completed_tasks is not none else 0 }}/{{ stats.total_tasks if stats.total_tasks is not none else 0 }}</div>
+                <div class="stat-label">Выполнено заданий</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">
+                    {% if stats.total_tasks and stats.total_tasks > 0 %}
+                        {{ ((stats.completed_tasks if stats.completed_tasks else 0) / stats.total_tasks * 100)|round(1) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+                <div class="stat-label">Процент выполнения</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.missed_tasks if stats.missed_tasks is not none else 0 }}</div>
+                <div class="stat-label">Пропущено заданий</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">
+                    {% if stats.average_grade %}
+                        {{ stats.average_grade|round(1) }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </div>
+                <div class="stat-label">Средняя оценка</div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <form id="leaveForm" action="{{ url_for('leave_class', user_id=user_id, class_name=class_name) }}" method="POST" style="display: inline;">
+                <button type="submit" class="btn-vision btn-danger" onclick="return confirmLeave()">Покинуть класс</button>
+            </form>
+            <a href="{{ url_for('student_data', user_id=user_id) }}" class="btn-vision">Назад</a>
+            <div class="checkmark" id="checkmark">
+                <svg viewBox="0 0 100 100">
+                    <path d="M20,50 L40,70 L80,30"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmLeave() {
+            if (confirm('Вы действительно хотите покинуть класс {{ class_name }}?')) {
+                // Показываем анимацию
+                document.getElementById('checkmark').style.display = 'block';
+
+                setTimeout(() => {
+                    // Отправляем форму после анимации
+                    document.getElementById('leaveForm').submit();
+                }, 1000);
+
+                return false; // Предотвращаем стандартное поведение формы
+            }
+            return false; // Отменяем отправку, если пользователь отказался
+        }
+    </script>
+</body>
+</html>
