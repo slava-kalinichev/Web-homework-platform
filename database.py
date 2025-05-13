@@ -1,9 +1,10 @@
 import sqlite3
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # Путь к базе данных
-DB_PATH = Path('C:/Users/Slava/Documents/Python/lmsDataBase')
+DB_PATH = Path(os.path.join('lmsDataBase.db'))
 
 
 def get_db_connection():

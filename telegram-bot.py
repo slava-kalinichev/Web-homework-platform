@@ -20,7 +20,7 @@ user_data = {}
 
 
 async def help_command(update, context):
-    await update.message.reply_text("Зарегистрируйся в свой аккаунт, чтобы получить доступ к полезным функциям!")
+    await update.message.reply_text("Зайди в свой аккаунт, чтобы получить доступ к полезным функциям! https://127.0.0.1:8080")
 
 
 async def start(update, context):
@@ -50,12 +50,12 @@ async def start_button(update, context):
     user_id = query.from_user.id
     user_data[user_id]['role'] = query.data  # Сохраняем роль
 
-    await query.edit_message_text(text=f"Вы выбрали роль: {query.data}. Теперь войдите в аккаунт (если у вас нет аккаунта, зарегистрируйтесь на веб-платформе")
+    await query.edit_message_text(text=f"Вы выбрали роль: {query.data}. Теперь войдите в аккаунт (если у вас нет аккаунта, зарегистрируйтесь на веб-платформе)")
     user_data[user_id]['state'] = 'waiting_for_login'  # Устанавливаем состояние "ожидает логин" для последующей аутентификации
 
 
 async def start_conversation(update, context) -> None:
-    """Обрабатывает сообщения пользователя в зависимости от текущего состояния."""
+    """ Функция обработки сообщения пользователя в зависимости от текущего состояния."""
     user_id = update.effective_user.id
     text = update.message.text
 
@@ -86,6 +86,19 @@ async def start_conversation(update, context) -> None:
             await update.message.reply_text(f"Аутентификация прошла успешно! Вы вошли как {user_data[user_id]['role']} с логином {login}.")
             del user_data[user_id]['state'] # Сбрасываем состояние
 
+            # Получаем роль, для которой нужно вывести возможные команды
+            role = user_data[user_id]['role']
+
+            if role == 'teacher':
+                keyboard = [['/new_submissions', '/class_grades']]
+
+            else:
+                keyboard = [['/new_tasks', '/assessed_tasks'],
+                            ['/grades']]
+
+            reply_markup = ReplyKeyboardMarkup(keyboard)
+            await update.message.reply_text("Для вас доступны следующие команды:", reply_markup=reply_markup)
+
         # Если пользователь не существует, то мы удаляем все полученные ранее данные и просим его пройти аутентификацию еще раз
         else:
             await update.message.reply_text("Неверный логин или пароль. Попробуйте еще раз")
@@ -97,14 +110,42 @@ async def start_conversation(update, context) -> None:
         await update.message.reply_text("Начни с /start")
 
 
+async def new_submissions(update, context):
+    pass
+
+
+async def class_grades(update, context):
+    pass
+
+
+async def new_tasks(update, context):
+    pass
+
+
+async def assessed_tasks(update, context):
+    pass
+
+
+async def grades(update, context):
+    pass
+
+
 def main():
-    """Запускает бота."""
+    """ Функция запуска бота. """
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(start_button))  # Обрабатывает нажатия кнопок
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start_conversation))
 
+    # Удобное добавление обработчиков
+    functions = [new_submissions, class_grades, new_tasks, assessed_tasks, grades]
+
+    for function in functions:
+        application.add_handler(CommandHandler(function.__name__, function))
+
+    # Запуск приложения
     application.run_polling()
 
 
