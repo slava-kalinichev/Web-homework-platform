@@ -14,7 +14,7 @@
             background: linear-gradient(135deg, #1a1a2e, #16213e);
             color: white;
             margin: 0;
-            padding: 40px; /* Основной отступ как в class_view */
+            padding: 40px;
             min-height: 100vh;
             backdrop-filter: blur(20px);
         }
@@ -28,7 +28,7 @@
             padding: 30px;
             max-width: 900px;
             margin: 0 auto;
-            margin-top: 20px; /* Дополнительный отступ сверху как в class_view */
+            margin-top: 20px;
         }
 
         h1 {
@@ -65,8 +65,9 @@
         }
 
         input, select {
-            width: 100%;
-            max-width: 250px;
+            width: calc(100%);
+            box-sizing: border-box;
+            max-width: 280px;
             padding: 12px;
             background: rgba(120, 120, 130, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -76,22 +77,23 @@
         }
 
         textarea {
-            width: 100%;
+            width: calc(100%);
+            box-sizing: border-box;
             padding: 12px;
             background: rgba(120, 120, 130, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             color: white;
             font-size: 16px;
-            height: 180px;
-            min-height: 180px;
+            height: 150px;
+            min-height: 150px;
             resize: vertical;
         }
 
         .button-group {
             display: flex;
             gap: 15px;
-            margin-top: auto;
+            margin-top: 12px;
             padding-top: 15px;
             align-items: center;
         }
@@ -174,29 +176,6 @@
             }
         }
 
-        @media (max-width: 768px) {
-            body {
-                padding: 20px;
-            }
-
-            .form-row {
-                flex-direction: column;
-                gap: 20px;
-            }
-
-            .form-column:first-child {
-                width: 100%;
-            }
-
-            input, select {
-                max-width: 100%;
-            }
-
-            textarea {
-                height: 150px;
-                min-height: 150px;
-            }
-        }
         #removeFileBtn {
         background: none;
         border: none;
@@ -226,6 +205,18 @@
 
     select#class_name option, select#subject option {
         color: black !important;
+    }
+    #autoDeadlineBtn {
+        background: rgba(94, 92, 230, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    #autoDeadlineBtn:hover {
+        background: rgba(94, 92, 230, 0.5);
     }
     </style>
 </head>
@@ -259,7 +250,17 @@
 
                     <div class="form-group">
                         <label for="deadline">Дедлайн:</label>
-                        <input type="date" id="deadline" name="deadline" required>
+                        <div style="display: flex; width: 280px; gap: 10px;">
+                            <input type="date" id="deadline" name="deadline" required style="flex: 1; min-width: 0;">
+                            <button type="button" id="autoDeadlineBtn" class="btn-vision" style="
+                                padding: 8px 12px;
+                                font-size: 14px;
+                                white-space: nowrap;
+                                flex-shrink: 0;
+                            ">
+                                Автодедлайн
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -346,6 +347,38 @@
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const fileName = e.target.files[0] ? e.target.files[0].name : 'Файл не выбран';
             document.getElementById('fileName').textContent = fileName;
+        });
+
+        document.getElementById('autoDeadlineBtn').addEventListener('click', function() {
+            const classSelect = document.getElementById('class_name');
+            const selectedClass = classSelect.value;
+
+            if (!selectedClass) {
+                alert('Выберите класс!');
+                return;
+            }
+
+            fetch(`/get_next_class_date/{{ user_id }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    class_name: selectedClass
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('deadline').value = data.date;
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при получении даты урока');
+            });
         });
     </script>
 </body>

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Путь к базе данных
-DB_PATH = Path(os.path.join('lmsDataBase.db'))
+DB_PATH = Path('lmsDataBase')
 
 
 def get_db_connection():
