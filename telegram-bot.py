@@ -1,5 +1,6 @@
 from admin_only import BOT_TOKEN
 from database import authenticate_user
+from request_parser import *
 
 from telegram import (InlineKeyboardButton,
                       InlineKeyboardMarkup)
@@ -129,27 +130,120 @@ async def handle_messages(update, context) -> None:
             await update.message.reply_text(f"Для вас доступны следующие команды:",
                                             reply_markup=create_command_keyboard(user_id))
 
+    elif user_data[user_id]['state'] == 'new_submissions':
+        student_name = text
+        reply_data = get_new_submissions(student_name)
+
+        if reply_data is False:
+            await update.message.reply_text("Такого ученика не существует")
+
+        elif not reply_data:
+            await update.message.reply_text(f"У ученика {student_name} проверены все сданные задания")
+
+        else:
+            await update.message.reply_textf(f"{student_name} имеет {len(reply_data)} непроверенных заданий: \n{'\n'.join(reply_data)}")
+
+        del user_data[user_id]['state']
+
+    elif user_data[user_id]['state'] == 'class_grades':
+        class_name = text
+        reply_data = get_class_grades(class_name)
+
+        if reply_data is False:
+            await update.message.reply_text("Такого класса не существует")
+
+        elif not reply_data:
+            await update.message.reply_text(f"У {class_name} еще нет оценок")
+
+        else:
+            await update.message.reply_text(f"Статистика {class_name}: \n{'\n'.join(reply_data)}")
+
+        del user_data[user_id]['state']
+
 
 # Функции команд учителей
 async def new_submissions(update, context):
-    pass
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    # Проверка на соответствие роли
+    if user_data[user_id]['role'] != 'учитель':
+        await query.message.reply_text("Извините, данная команда доступна только учителям")
+
+    # Устанавливаем состояние
+    user_data[user_id]['state'] = 'new_submissions'
+    await query.message.reply_text("Пожалуйста, введите имя ученика:")
 
 
 async def class_grades(update, context):
-    pass
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    # Проверка на соответствие роли
+    if user_data[user_id]['role'] != 'учитель':
+        await query.message.reply_text("Извините, данная команда доступна только учителям")
+
+    # Устанавливаем состояние
+    user_data[user_id]['state'] = 'class_grades'
+    await query.message.reply_text("Пожалуйста, введите названия класса:")
 
 
 # Функции команд учеников
 async def new_tasks(update, context):
-    pass
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    # Проверка на соответствие роли
+    if user_data[user_id]['role'] != 'ученик':
+        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+
+    reply_data = get_new_tasks(user_data[user_id]['login'])
+
+    if not reply_data:
+        await query.message.reply_text("У вас нет новых заданий")
+
+    else:
+        await query.message.reply_text(f"У вас {len(reply_data)} невыполненных заданий: \n{'\n'.join(reply_data)}")
 
 
 async def assessed_tasks(update, context):
-    pass
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    # Проверка на соответствие роли
+    if user_data[user_id]['role'] != 'ученик':
+        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+
+    reply_data = get_assessed_tasks(user_data[user_id]['login'])
+
+    if not reply_data:
+        await query.message.reply_text("Оцененных заданий нет")
+
+    else:
+        await query.message.reply_text(f"У вас оценено {len(reply_data)} заданий: \n{'\n'.join(reply_data)}")
 
 
 async def grades(update, context):
-    pass
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    # Проверка на соответствие роли
+    if user_data[user_id]['role'] != 'ученик':
+        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+
+    reply_data = get_grades(user_data[user_id]['login'])
+
+    if not reply_data:
+        await query.message.reply_text("У вас нет оценок")
+
+    else:
+        await query.message.reply_text(f"За все время вы получили {len(reply_data)} оценок: \n"
+                                        f"{'\n'.join(f'{task} - {grade}' for task, grade in reply_data.items())}")
 
 
 # Переменная соответствия callback_data и названий обработчиков
@@ -185,19 +279,12 @@ async def button_handler(update, context):
         await query.message.reply_text("Пожалуйста, войдите в аккаунт с помощью /start")
         return
 
-    role = user_data[user_id]['role']
-
     # Вызываем соответствующую функцию на основе callback_data
-    if role == 'учитель':
-        if callback_data not in ['new_submissions', 'class_grades']:
-            await query.message.reply_text("Неизвестная команда или нет доступа")
-
-    elif role == 'ученик':
-        if callback_data not in ['new_tasks', 'assessed_tasks', 'grades']:
-            await query.message.reply_text("Неизвестная команда или нет доступа")
+    if callback_data in match:
+        await match[callback_data](update, context)
 
     else:
-        await match[callback_data](update, context)
+        await query.message.reply_text("Неизвестная команда.")
 
 
 def main():
@@ -213,7 +300,6 @@ def main():
 
     # Обработчики общения с пользователем
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, new_submissions))
 
     # Запуск приложения
     application.run_polling()
