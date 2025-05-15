@@ -29,8 +29,35 @@ commands = {
 }
 
 
+def create_command_keyboard(user_id):
+    # Получаем роль, для которой нужно вывести возможные команды
+    role = user_data[user_id]['role']
+
+    # Создаем удобную для пользователей клавиатуру
+    keyboard = []
+    for command in commands[role]:
+        new_button = InlineKeyboardButton(command['text'],
+                                          callback_data=command['callback_data'])
+        keyboard.append([new_button])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
 async def help_command(update, context):
-    await update.message.reply_text("Зайди в свой аккаунт, чтобы получить доступ к полезным функциям! https://127.0.0.1:8080")
+    user_id = update.effective_user.id
+
+    if user_id not in user_data:
+        await update.message.reply_text("Начни диалог при помощи команды /start")
+
+    elif 'authenticated' not in user_data[user_id]:
+        await update.message.reply_text("Зайди в свой аккаунт, чтобы получить доступ к полезным функциям! "
+                                        "Если нет аккаунта, зарегистрируйся на нашей платформе "
+                                        "https://127.0.0.1:8080")
+
+    else:
+        await update.message.reply_text(f"Для вас доступны следующие команды:",
+                                        reply_markup=create_command_keyboard(user_id))
 
 
 async def start(update, context):
@@ -51,14 +78,25 @@ async def start(update, context):
     await update.message.reply_text('Вы ученик или учитель?', reply_markup=reply_markup)
 
 
-async def authentication(update, context) -> None:
+async def handle_messages(update, context) -> None:
     """ Функция обработки сообщения пользователя в зависимости от текущего состояния."""
+
+    # Данная функция обрабатывает все сообщения пользователя,
+    # которые используются как части диалогов для выполнения других функций
+    # посредством установки состояния 'state', после чего введенное пользователем сообщение
+    # считывается как необходимое для функции, указанной в том самом состоянии
+
     user_id = update.effective_user.id
     text = update.message.text
 
     # Проверяем, зарегистрирован ли идентификатор пользователя в боте
-    if user_id not in user_data or 'state' not in user_data[user_id]:
+    if user_id not in user_data:
         await update.message.reply_text("Пожалуйста, начните с команды /start.")
+        return
+
+    # Проверяем наличие состояния
+    if 'state' not in user_data[user_id]:
+        await update.message.reply_text("Я не понимаю такой команды. Список доступных команд можно посмотреть с помощью команды /help")
         return
 
     # Если пользователь есть, начинаем проводить авторизацию.
@@ -88,21 +126,8 @@ async def authentication(update, context) -> None:
             await update.message.reply_text(f"Аутентификация прошла успешно! Вы вошли как {user_data[user_id]['role']} с логином {login}.")
             del user_data[user_id]['state'] # Сбрасываем состояние
 
-    # Предоставляем функционал только для авторизированных пользователей
-    if 'authenticated' in user_data[user_id]:
-        # Получаем роль, для которой нужно вывести возможные команды
-        role = user_data[user_id]['role']
-
-        # Создаем удобную для пользователей клавиатуру
-        keyboard = []
-        for command in commands[role]:
-            new_button = InlineKeyboardButton(command['text'],
-                                              callback_data=command['callback_data'])
-            keyboard.append([new_button])
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"Для вас доступны следующие команды:",
-                                        reply_markup=reply_markup)
+            await update.message.reply_text(f"Для вас доступны следующие команды:",
+                                            reply_markup=create_command_keyboard(user_id))
 
 
 # Функции команд учителей
@@ -187,7 +212,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_handler))
 
     # Обработчики общения с пользователем
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, authentication))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, new_submissions))
 
     # Запуск приложения
