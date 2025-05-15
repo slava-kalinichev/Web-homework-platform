@@ -303,6 +303,16 @@
             font-size: 14px;
         }
 
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+        }
+
         .form-buttons {
             display: flex;
             justify-content: flex-end;
@@ -342,10 +352,6 @@
             margin-top: 15px;
         }
 
-        .checkbox-container input {
-            margin-right: 10px;
-        }
-
         .checkbox-label {
             font-size: 14px;
         }
@@ -357,9 +363,99 @@
             color: black !important; /* Цвет элементов в выпадающем списке */
             background-color: white;
         }
+
+        /* Стили для модального окна школы */
+        .school-modal-content {
+            background: rgba(50, 50, 60, 0.95);
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            width: 450px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .school-modal-error {
+            color: #ff453a;
+            margin-bottom: 15px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 69, 58, 0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .footnote {
+            color: rgba(255,255,255,0.5);
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        /* Анимация галочки */
+        .checkmark-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .checkmark-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .checkmark svg {
+            width: 50px;
+            height: 50px;
+            position: relative;
+            z-index: 2002;
+        }
+
+        .checkmark path {
+            stroke: #30d158;
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 1.5s ease-in-out forwards;
+        }
+
+        @keyframes draw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* Стиль для заголовка таблицы классов школы */
+        .school-classes-header {
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .school-classes-header:hover {
+            color: #c2e4ff;
+        }
     </style>
 </head>
 <body>
+    <div class="checkmark-overlay" id="checkmarkOverlay">
+        <div class="checkmark">
+            <svg viewBox="0 0 100 100">
+                <path d="M20,50 L40,70 L80,30"/>
+            </svg>
+        </div>
+    </div>
+
     <div class="glass-panel">
         <a href="/index" class="logout-btn">Выйти</a>
 
@@ -423,7 +519,7 @@
                 <!-- Школьные классы -->
                 <div class="glass-panel">
                     <div class="panel-header">
-                        <b>Классы школы {% if school_name %} {{ school_name }}{% endif %}</b>
+                        <b class="school-classes-header" id="schoolClassesHeader">Классы школы {% if school_name %} {{ school_name }}{% endif %}</b>
                         {% if is_school_teacher %}
                             <a href="{{ url_for('new_school_class', user_id=user_id) }}" class="btn-vision">
                                 Добавить класс
@@ -582,8 +678,32 @@
         </div>
     </div>
 
+    <!-- Модальное окно управления школой -->
+    <div id="schoolModal" class="modal">
+        <div class="school-modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Школа</span>
+                <span class="close-modal">&times;</span>
+            </div>
+
+            <div id="schoolModalError" class="school-modal-error"></div>
+
+            <div class="form-group">
+                <label class="form-label">Введите новый код доступа школы:</label>
+                <input type="text" id="schoolCodeInput" class="form-input" placeholder="Код доступа">
+            </div>
+
+            <div class="form-buttons">
+                <button id="leaveSchoolBtn" class="btn-reset" {% if not is_school_teacher %}disabled{% endif %}>Покинуть школу</button>
+                <button id="confirmSchoolBtn" class="btn-confirm" disabled>Подтвердить</button>
+            </div>
+
+            <div class="footnote">При подтверждении, вы потеряете доступ к текущим школьным классам</div>
+        </div>
+    </div>
+
     <script>
-        // Добавляем анимации при наведении
+        // Анимации при наведении
         document.querySelectorAll('tr').forEach(row => {
             row.addEventListener('mouseenter', function() {
                 this.style.transform = 'translateY(-2px)';
@@ -623,7 +743,7 @@
         const includeCompleted = document.getElementById('includeCompleted');
         const applyFiltersBtn = document.getElementById('applyFilters');
         const resetFiltersBtn = document.getElementById('resetFilters');
-        const closeModalBtn = document.querySelector('.close-modal');
+        const closeModalBtn = document.querySelectorAll('.close-modal');
 
         // Сохраняем оригинальные данные таблицы для сброса
         const originalTableBody = document.getElementById('tasksTableBody').innerHTML;
@@ -634,17 +754,128 @@
             updateFilterValues();
         });
 
-        // Закрываем модальное окно при клике на крестик
-        closeModalBtn.addEventListener('click', function() {
-            modal.style.display = 'none';
+        // Модальное окно школы
+        const schoolModal = document.getElementById('schoolModal');
+        const schoolClassesHeader = document.getElementById('schoolClassesHeader');
+        const schoolCodeInput = document.getElementById('schoolCodeInput');
+        const confirmSchoolBtn = document.getElementById('confirmSchoolBtn');
+        const leaveSchoolBtn = document.getElementById('leaveSchoolBtn');
+        const schoolModalError = document.getElementById('schoolModalError');
+
+        // Показываем модальное окно школы при клике на заголовок
+        schoolClassesHeader.addEventListener('click', function() {
+            schoolModal.style.display = 'block';
         });
 
-        // Закрываем модальное окно при клике вне его
+        // Закрываем модальные окна при клике на крестик
+        closeModalBtn.forEach(btn => {
+            btn.addEventListener('click', function() {
+                modal.style.display = 'none';
+                schoolModal.style.display = 'none';
+                schoolModalError.style.display = 'none';
+            });
+        });
+
+        // Закрываем модальные окна при клике вне их
         window.addEventListener('click', function(event) {
             if (event.target === modal) {
                 modal.style.display = 'none';
             }
+            if (event.target === schoolModal) {
+                schoolModal.style.display = 'none';
+                schoolModalError.style.display = 'none';
+            }
         });
+
+        // Активация кнопки подтверждения при вводе кода школы
+        schoolCodeInput.addEventListener('input', function() {
+            confirmSchoolBtn.disabled = this.value.trim() === '';
+        });
+
+        // Обработка нажатия кнопки "Покинуть школу"
+        leaveSchoolBtn.addEventListener('click', async function() {
+            const schoolName = '{{ school_name }}';
+
+            if (!confirm(`Вы действительно хотите покинуть школу ${schoolName}? При этом все Ваши задания для классов данной школы будут удалены.`)) {
+                return;
+            }
+
+            const teacherId = '{{ teacher_id }}';
+
+            try {
+                const response = await fetch('/leave_school', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        teacher_id: teacherId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showCheckmark();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    schoolModalError.textContent = data.message;
+                    schoolModalError.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error leaving school:', error);
+                schoolModalError.textContent = 'Ошибка при выходе из школы';
+                schoolModalError.style.display = 'block';
+            }
+        });
+
+        // Обработка нажатия кнопки "Подтвердить"
+        confirmSchoolBtn.addEventListener('click', async function() {
+            const teacherId = '{{ teacher_id }}';
+            const schoolCode = schoolCodeInput.value.trim();
+
+            try {
+                const response = await fetch('/join_school', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        teacher_id: teacherId,
+                        school_code: schoolCode
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showCheckmark();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    schoolModalError.textContent = data.message;
+                    schoolModalError.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error joining school:', error);
+                schoolModalError.textContent = 'Ошибка при присоединении к школе';
+                schoolModalError.style.display = 'block';
+            }
+        });
+
+        // Функция для показа анимации галочки
+        function showCheckmark() {
+            const overlay = document.getElementById('checkmarkOverlay');
+            overlay.classList.add('show');
+
+            // Автоматическое скрытие через 2 секунды
+            setTimeout(() => {
+                overlay.classList.remove('show');
+            }, 2000);
+        }
 
         // Обновляем значения фильтра при изменении поля "Фильтр по:"
         filterBy.addEventListener('change', function() {
@@ -715,6 +946,7 @@
             });
         }
 
+        // Функция для естественной сортировки
         function naturalSort(a, b) {
             const ax = [], bx = [];
 

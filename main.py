@@ -1,5 +1,8 @@
 from flask import (Flask, render_template, flash, redirect, url_for,
                    request, session, jsonify, make_response)
+from googleapiclient import discovery
+from google.oauth2 import service_account
+import datetime
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -10,6 +13,40 @@ import re
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
+
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+calendarId = 'viacheslavkalinichev@gmail.com'
+SERVICE_ACCOUNT_FILE = 'slava-lms-761d02a60026.json'
+
+
+class GoogleCalendar(object):
+    def __init__(self):
+        credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        self.service = discovery.build('calendar', 'v3', credentials=credentials)
+
+    def get_next_class_event(self, class_name):
+        now = datetime.utcnow().isoformat() + 'Z'
+        t_max = (datetime.utcnow() + timedelta(days=7)).isoformat() + 'Z'
+
+        # Ищем события с названием "Урок с [название класса]"
+        query = f'Урок с {class_name}'
+
+        events_result = self.service.events().list(
+            calendarId=calendarId,
+            timeMin=now,
+            timeMax=t_max,
+            q=query,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        events = events_result.get('items', [])
+
+        if not events:
+            return None
+
+        # Возвращаем ближайшее событие
+        return events[0]
 
 
 # Форма входа в приложение
@@ -384,6 +421,14 @@ def new_task(user_id):
             )
 
         if task_id:
+            calendar = GoogleCalendar()
+            print("+ - create event\n? - print event list\n")
+
+            #event = calendar.create_event_dict()
+            #calendar.create_event(event)
+
+            calendar.get_events_list()
+
             return redirect(url_for('mainTeacher', user_id=user_id))
         else:
             flash('Ошибка при создании задания', 'error')
@@ -966,6 +1011,33 @@ def handle_join_school():
         school_code = request.json.get('school_code')
         success, message = join_school(teacher_id, school_code)
         return jsonify({'success': success, 'message': message})
+
+
+@app.route('/get_next_class_date/<user_id>', methods=['POST'])
+def get_next_class_date(user_id):
+    if 'user_id' not in session or session['user_id'] != user_id or session['user_role'] != 'teacher':
+        return jsonify({'success': False, 'message': 'Сессия завершена'}), 403
+
+    data = request.get_json()
+    class_name = data.get('class_name')
+
+    if not class_name:
+        return jsonify({'success': False, 'message': 'Выберите класс'})
+
+    calendar = GoogleCalendar()
+    event = calendar.get_next_class_event(class_name)
+
+    if not event:
+        return jsonify({'success': False, 'message': f'В ближайшее время нет уроков с {class_name}'})
+
+    # Извлекаем дату из события и форматируем её
+    start_date = event['start'].get('dateTime', event['start'].get('date'))
+    event_date = datetime.fromisoformat(start_date).date()
+
+    return jsonify({
+        'success': True,
+        'date': event_date.isoformat()
+    })
 
 if __name__ == '__main__':
     app.run(port=8080, host='127.0.0.1')
