@@ -1,14 +1,10 @@
-import asyncio
 from admin_only import BOT_TOKEN
 from database import authenticate_user
 
-from telegram import (ReplyKeyboardMarkup,
-                      InlineKeyboardButton,
+from telegram import (InlineKeyboardButton,
                       InlineKeyboardMarkup)
 
-from telegram.ext import (Application,
-                          ConversationHandler,
-                          MessageHandler,
+from telegram.ext import (MessageHandler,
                           CommandHandler,
                           ApplicationBuilder,
                           CallbackQueryHandler,
@@ -17,6 +13,20 @@ from telegram.ext import (Application,
 
 # Создаем глобальную переменную для хранения информации о пользователях
 user_data = {}
+
+# Переменная для хранения команд. Значения - списки словарей, где
+# Ключи - названия параметров для добавления кнопка, а значения - значения этих параметров
+commands = {
+    'учитель': [
+        {'text': 'Новые работы', 'callback_data': 'new_submissions'},
+        {'text': 'Ведомость оценок', 'callback_data': 'class_grades'}
+    ],
+    'ученик': [
+        {'text': 'Новые задания', 'callback_data': 'new_tasks'},
+        {'text': 'Проверенные задания', 'callback_data': 'assessed_tasks'},
+        {'text': 'Оценки', 'callback_data': 'grades'}
+    ]
+}
 
 
 async def help_command(update, context):
@@ -33,28 +43,15 @@ async def start(update, context):
 
     # Создаем клавиатуру с удобным выбором для пользователя
     keyboard = [
-        [InlineKeyboardButton("Ученик", callback_data='student')],
-        [InlineKeyboardButton("Учитель", callback_data='teacher')],
+        [InlineKeyboardButton("Ученик", callback_data='ученик')],
+        [InlineKeyboardButton("Учитель", callback_data='учитель')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text('Вы ученик или учитель?', reply_markup=reply_markup)
 
 
-async def start_button(update, context):
-    """ Функция обработки выбора роли пользователя. """
-    # Ожидаем действие пользователя
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    user_data[user_id]['role'] = query.data  # Сохраняем роль
-
-    await query.edit_message_text(text=f"Вы выбрали роль: {query.data}. Теперь войдите в аккаунт (если у вас нет аккаунта, зарегистрируйтесь на веб-платформе)")
-    user_data[user_id]['state'] = 'waiting_for_login'  # Устанавливаем состояние "ожидает логин" для последующей аутентификации
-
-
-async def start_conversation(update, context) -> None:
+async def authentication(update, context) -> None:
     """ Функция обработки сообщения пользователя в зависимости от текущего состояния."""
     user_id = update.effective_user.id
     text = update.message.text
@@ -79,37 +76,36 @@ async def start_conversation(update, context) -> None:
         login = user_data[user_id]['login']
 
         # Проверяем, существует ли такой пользователь
-        if authenticate_user(login, password):
-            # Если да, то сохраняем пользователя в переменной
-            # При этом в целях безопасности мы нигде не сохраняем указанный пароль
+        if not authenticate_user(login, password):
+            # Если нет, просто сразу же выходим из обработки
+            await update.message.reply_text("Неверный логин или пароль. Попробуйте еще раз")
+            del user_data[user_id]['login']  # Сбрасываем данные пользователя
+            user_data[user_id]['state'] = 'waiting_for_login'
+
+        else:
+            # Если да, то сохраняем пользователя
             user_data[user_id]['authenticated'] = True
             await update.message.reply_text(f"Аутентификация прошла успешно! Вы вошли как {user_data[user_id]['role']} с логином {login}.")
             del user_data[user_id]['state'] # Сбрасываем состояние
 
-            # Получаем роль, для которой нужно вывести возможные команды
-            role = user_data[user_id]['role']
+    # Предоставляем функционал только для авторизированных пользователей
+    if 'authenticated' in user_data[user_id]:
+        # Получаем роль, для которой нужно вывести возможные команды
+        role = user_data[user_id]['role']
 
-            if role == 'teacher':
-                keyboard = [['/new_submissions', '/class_grades']]
+        # Создаем удобную для пользователей клавиатуру
+        keyboard = []
+        for command in commands[role]:
+            new_button = InlineKeyboardButton(command['text'],
+                                              callback_data=command['callback_data'])
+            keyboard.append([new_button])
 
-            else:
-                keyboard = [['/new_tasks', '/assessed_tasks'],
-                            ['/grades']]
-
-            reply_markup = ReplyKeyboardMarkup(keyboard)
-            await update.message.reply_text("Для вас доступны следующие команды:", reply_markup=reply_markup)
-
-        # Если пользователь не существует, то мы удаляем все полученные ранее данные и просим его пройти аутентификацию еще раз
-        else:
-            await update.message.reply_text("Неверный логин или пароль. Попробуйте еще раз")
-            del user_data[user_id]['login'] # Сбрасываем данные пользователя
-            user_data[user_id]['state'] = 'waiting_for_login'
-
-    # Случай, когда бот не понимает запрос пользователя
-    else:
-        await update.message.reply_text("Начни с /start")
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(f"Для вас доступны следующие команды:",
+                                        reply_markup=reply_markup)
 
 
+# Функции команд учителей
 async def new_submissions(update, context):
     pass
 
@@ -118,6 +114,7 @@ async def class_grades(update, context):
     pass
 
 
+# Функции команд учеников
 async def new_tasks(update, context):
     pass
 
@@ -130,20 +127,68 @@ async def grades(update, context):
     pass
 
 
+# Переменная соответствия callback_data и названий обработчиков
+match = {'new_submissions': new_submissions,
+         'class_grades': class_grades,
+         'new_tasks': new_tasks,
+         'assessed_tasks': assessed_tasks,
+         'grades': grades}
+
+
+async def button_handler(update, context):
+    """ Обрабатывает нажатия на inline-кнопки команд. """
+    # Ожидаем действие пользователя
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    callback_data = query.data
+
+    # Обработка выбора роли (Ученик/Учитель)
+    if callback_data in ['ученик', 'учитель']:
+        user_data[user_id]['role'] = callback_data  # Сохраняем роль
+        await query.edit_message_text(
+            text=f"Вы выбрали роль: {callback_data}. "
+                 f"Теперь войдите в аккаунт (если у вас нет аккаунта, зарегистрируйтесь на веб-платформе) "
+                 f"Введите логин:")
+        user_data[user_id]['state'] = 'waiting_for_login'  # Устанавливаем состояние "ожидает логин"
+        return  # Завершаем обработку, чтобы не перешло к командам
+
+    # Переходим к обработке команд
+    # Проверяем, аутентифицирован ли пользователь
+    if user_id not in user_data or not user_data[user_id].get('authenticated'):
+        await query.message.reply_text("Пожалуйста, войдите в аккаунт с помощью /start")
+        return
+
+    role = user_data[user_id]['role']
+
+    # Вызываем соответствующую функцию на основе callback_data
+    if role == 'учитель':
+        if callback_data not in ['new_submissions', 'class_grades']:
+            await query.message.reply_text("Неизвестная команда или нет доступа")
+
+    elif role == 'ученик':
+        if callback_data not in ['new_tasks', 'assessed_tasks', 'grades']:
+            await query.message.reply_text("Неизвестная команда или нет доступа")
+
+    else:
+        await match[callback_data](update, context)
+
+
 def main():
     """ Функция запуска бота. """
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Обработчики стартовых команд
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(start_button))  # Обрабатывает нажатия кнопок
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, start_conversation))
 
-    # Удобное добавление обработчиков
-    functions = [new_submissions, class_grades, new_tasks, assessed_tasks, grades]
+    # Обработчик нажатия всех кнопок
+    application.add_handler(CallbackQueryHandler(button_handler))
 
-    for function in functions:
-        application.add_handler(CommandHandler(function.__name__, function))
+    # Обработчики общения с пользователем
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, authentication))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, new_submissions))
 
     # Запуск приложения
     application.run_polling()
