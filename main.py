@@ -427,8 +427,6 @@ def new_task(user_id):
             #event = calendar.create_event_dict()
             #calendar.create_event(event)
 
-            calendar.get_events_list()
-
             return redirect(url_for('mainTeacher', user_id=user_id))
         else:
             flash('Ошибка при создании задания', 'error')

@@ -31,18 +31,17 @@ commands = {
 
 
 def create_command_keyboard(user_id):
-    # Получаем роль, для которой нужно вывести возможные команды
     role = user_data[user_id]['role']
-
-    # Создаем удобную для пользователей клавиатуру
     keyboard = []
-    for command in commands[role]:
-        new_button = InlineKeyboardButton(command['text'],
-                                          callback_data=command['callback_data'])
-        keyboard.append([new_button])
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    return reply_markup
+    # Добавляем основные команды
+    for command in commands[role]:
+        keyboard.append([InlineKeyboardButton(command['text'], callback_data=command['callback_data'])])
+
+    # Добавляем кнопку "Выйти" внизу
+    keyboard.append([InlineKeyboardButton("⬅️ Выйти", callback_data='logout')])
+
+    return InlineKeyboardMarkup(keyboard)
 
 
 async def help_command(update, context):
@@ -80,86 +79,103 @@ async def start(update, context):
 
 
 async def handle_messages(update, context) -> None:
-    """ Функция обработки сообщения пользователя в зависимости от текущего состояния."""
-
-    # Данная функция обрабатывает все сообщения пользователя,
-    # которые используются как части диалогов для выполнения других функций
-    # посредством установки состояния 'state', после чего введенное пользователем сообщение
-    # считывается как необходимое для функции, указанной в том самом состоянии
-
+    """Функция обработки сообщения пользователя в зависимости от текущего состояния."""
     user_id = update.effective_user.id
     text = update.message.text
 
-    # Проверяем, зарегистрирован ли идентификатор пользователя в боте
     if user_id not in user_data:
         await update.message.reply_text("Пожалуйста, начните с команды /start.")
         return
 
-    # Проверяем наличие состояния
     if 'state' not in user_data[user_id]:
-        await update.message.reply_text("Я не понимаю такой команды. Список доступных команд можно посмотреть с помощью команды /help")
+        await update.message.reply_text("Я не понимаю такой команды. Используйте /help")
         return
 
-    # Если пользователь есть, начинаем проводить авторизацию.
-    # Проверяем на состояние ожидания логина
+    # Обработка состояния ожидания имени класса
+    if user_data[user_id]['state'] == 'waiting_for_class_name':
+        class_name = text
+        reply_data = get_class_grades(class_name, user_data[user_id]['login'])
+
+        if reply_data is False:
+            await update.message.reply_text("Класс не найден или у вас нет к нему доступа")
+        elif isinstance(reply_data, list):
+            grades_list = '\n'.join(reply_data)
+            await update.message.reply_text(grades_list, parse_mode='HTML')
+
+        # Безопасное удаление состояния
+        if 'state' in user_data[user_id]:
+            del user_data[user_id]['state']
+        return
+
+    # Обработка состояния ожидания логина
     if user_data[user_id]['state'] == 'waiting_for_login':
         user_data[user_id]['login'] = text
         await update.message.reply_text("Теперь введите пароль:")
-
-        # Устанавливаем статус "ожидает пароль"
         user_data[user_id]['state'] = 'waiting_for_password'
+        return
 
-    # Проверяем на состояние ожидания пароля
-    elif user_data[user_id]['state'] == 'waiting_for_password':
+    # Обработка состояния ожидания пароля
+    if user_data[user_id]['state'] == 'waiting_for_password':
         password = text
         login = user_data[user_id]['login']
 
-        # Проверяем, существует ли такой пользователь
-        if not authenticate_user(login, password):
-            # Если нет, просто сразу же выходим из обработки
-            await update.message.reply_text("Неверный логин или пароль. Попробуйте еще раз")
-            del user_data[user_id]['login']  # Сбрасываем данные пользователя
+        auth_result = authenticate_user(login, password)
+
+        if auth_result['status'] == 'login_not_found':
+            await update.message.reply_text("Неверный логин. Попробуйте еще раз")
+            del user_data[user_id]['login']
             user_data[user_id]['state'] = 'waiting_for_login'
-
-        else:
-            # Если да, то сохраняем пользователя
+        elif auth_result['status'] == 'wrong_password':
+            await update.message.reply_text("Неверный пароль. Попробуйте еще раз")
+            user_data[user_id]['state'] = 'waiting_for_password'
+        elif auth_result['status'] == 'account_inactive':
+            await update.message.reply_text("Ваш аккаунт деактивирован. Обратитесь к администратору")
+            del user_data[user_id]['state']
+        elif auth_result['status'] == 'success':
             user_data[user_id]['authenticated'] = True
-            await update.message.reply_text(f"Аутентификация прошла успешно! Вы вошли как {user_data[user_id]['role']} с логином {login}.")
-            del user_data[user_id]['state'] # Сбрасываем состояние
+            user_data[user_id]['role'] = 'учитель' if auth_result['role'] == 'teacher' else 'ученик'
+            await update.message.reply_text(
+                f"Аутентификация успешна! Вы вошли как {user_data[user_id]['role']} {login}."
+            )
+            del user_data[user_id]['state']
+            await update.message.reply_text(
+                "Для вас доступны следующие команды:",
+                reply_markup=create_command_keyboard(user_id)
+            )
+        return
 
-            await update.message.reply_text(f"Для вас доступны следующие команды:",
-                                            reply_markup=create_command_keyboard(user_id))
-
-    elif user_data[user_id]['state'] == 'new_submissions':
-        student_name = text
-        reply_data = get_new_submissions(student_name)
-
-        if reply_data is False:
-            await update.message.reply_text("Такого ученика не существует")
-
-        elif not reply_data:
-            await update.message.reply_text(f"У ученика {student_name} проверены все сданные задания")
-
-        else:
-            await update.message.reply_textf(f"{student_name} имеет {len(reply_data)} непроверенных заданий: \n{'\n'.join(reply_data)}")
-
-        del user_data[user_id]['state']
-
-    elif user_data[user_id]['state'] == 'class_grades':
+    # Обработка состояния ожидания имени класса для ведомости оценок
+    if user_data[user_id]['state'] == 'waiting_for_class_name':
         class_name = text
-        reply_data = get_class_grades(class_name)
+        reply_data = get_class_grades(class_name, user_data[user_id]['login'])
 
         if reply_data is False:
-            await update.message.reply_text("Такого класса не существует")
+            await update.message.reply_text("Класс не найден или у вас нет к нему доступа")
+        elif user_data[user_id]['state'] == 'waiting_for_class_name':
+            class_name = text
+            reply_data = get_class_grades(class_name, user_data[user_id]['login'])
 
-        elif not reply_data:
-            await update.message.reply_text(f"У {class_name} еще нет оценок")
+            if reply_data is False:
+                await update.message.reply_text("Класс не найден или у вас нет к нему доступа")
+            elif isinstance(reply_data, list) and reply_data:  # Проверяем что это список и он не пустой
+                grades_list = '\n'.join(reply_data)
+                await update.message.reply_text(
+                    grades_list,
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text("Нет данных для отображения")
 
+            del user_data[user_id]['state']
         else:
-            await update.message.reply_text(f"Статистика {class_name}: \n{'\n'.join(reply_data)}")
+            grades_list = '\n'.join(reply_data)
+            await update.message.reply_text(
+                grades_list,
+                parse_mode='HTML'
+            )
 
         del user_data[user_id]['state']
-
+        return
 
 # Функции команд учителей
 async def new_submissions(update, context):
@@ -167,28 +183,22 @@ async def new_submissions(update, context):
     await query.answer()
     user_id = query.from_user.id
 
-    # Проверка на соответствие роли
     if user_data[user_id]['role'] != 'учитель':
-        await query.message.reply_text("Извините, данная команда доступна только учителям")
+        await query.message.reply_text("Эта команда доступна только учителям")
+        return
 
-    # Устанавливаем состояние
-    user_data[user_id]['state'] = 'new_submissions'
-    await query.message.reply_text("Пожалуйста, введите имя ученика:")
+    reply_data = get_new_submissions(user_data[user_id]['login'])
 
-
-async def class_grades(update, context):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-
-    # Проверка на соответствие роли
-    if user_data[user_id]['role'] != 'учитель':
-        await query.message.reply_text("Извините, данная команда доступна только учителям")
-
-    # Устанавливаем состояние
-    user_data[user_id]['state'] = 'class_grades'
-    await query.message.reply_text("Пожалуйста, введите названия класса:")
-
+    if reply_data is False:
+        await query.message.reply_text("Ошибка доступа")
+    elif not reply_data:
+        await query.message.reply_text("Нет работ, ожидающих проверки")
+    else:
+        tasks_list = '\n'.join(reply_data)
+        await query.message.reply_text(
+            f"<b>Работы на проверке ({len(reply_data)}):</b>\n{tasks_list}",
+            parse_mode='HTML'
+        )
 
 # Функции команд учеников
 async def new_tasks(update, context):
@@ -196,63 +206,83 @@ async def new_tasks(update, context):
     await query.answer()
     user_id = query.from_user.id
 
-    # Проверка на соответствие роли
     if user_data[user_id]['role'] != 'ученик':
-        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+        await query.message.reply_text("Эта команда доступна только ученикам")
+        return
 
     reply_data = get_new_tasks(user_data[user_id]['login'])
 
     if not reply_data:
         await query.message.reply_text("У вас нет новых заданий")
-
     else:
-        await query.message.reply_text(f"У вас {len(reply_data)} невыполненных заданий: \n{'\n'.join(reply_data)}")
-
+        tasks_list = '\n'.join(reply_data)
+        await query.message.reply_text(
+            f"<b>Ваши новые задания ({len(reply_data)}):</b>\n{tasks_list}",
+            parse_mode='HTML'
+        )
 
 async def assessed_tasks(update, context):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
 
-    # Проверка на соответствие роли
     if user_data[user_id]['role'] != 'ученик':
-        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+        await query.message.reply_text("Эта команда доступна только ученикам")
+        return
 
     reply_data = get_assessed_tasks(user_data[user_id]['login'])
 
     if not reply_data:
         await query.message.reply_text("Оцененных заданий нет")
-
     else:
-        await query.message.reply_text(f"У вас оценено {len(reply_data)} заданий: \n{'\n'.join(reply_data)}")
-
+        tasks_list = '\n'.join(reply_data)
+        await query.message.reply_text(
+            f"<b>Ваши проверенные задания ({len(reply_data)}):</b>\n{tasks_list}",
+            parse_mode='HTML'
+        )
 
 async def grades(update, context):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
 
-    # Проверка на соответствие роли
     if user_data[user_id]['role'] != 'ученик':
-        await query.message.reply_text("Извините, данная команда доступна только ученикам")
+        await query.message.reply_text("Эта команда доступна только ученикам")
+        return
 
     reply_data = get_grades(user_data[user_id]['login'])
 
     if not reply_data:
         await query.message.reply_text("У вас нет оценок")
-
     else:
-        await query.message.reply_text(f"За все время вы получили {len(reply_data)} оценок: \n"
-                                        f"{'\n'.join(f'{task} - {grade}' for task, grade in reply_data.items())}")
+        grades_list = '\n'.join(f"{task} - {grade}" for task, grade in reply_data.items())
+        await query.message.reply_text(
+            f"<b>Ваши оценки ({len(reply_data)}):</b>\n{grades_list}",
+            parse_mode='HTML'
+        )
 
+
+async def class_grades_handler(update, context):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if user_data[user_id]['role'] != 'учитель':
+        await query.message.reply_text("Эта команда доступна только учителям")
+        return
+
+    user_data[user_id]['state'] = 'waiting_for_class_name'
+    await query.message.reply_text("Введите название класса:")
 
 # Переменная соответствия callback_data и названий обработчиков
-match = {'new_submissions': new_submissions,
-         'class_grades': class_grades,
-         'new_tasks': new_tasks,
-         'assessed_tasks': assessed_tasks,
-         'grades': grades}
-
+match = {
+    'new_submissions': new_submissions,
+    'class_grades': class_grades_handler,
+    'new_tasks': new_tasks,
+    'assessed_tasks': assessed_tasks,
+    'grades': grades,
+    'logout': lambda u, c: None
+}
 
 async def button_handler(update, context):
     """ Обрабатывает нажатия на inline-кнопки команд. """
@@ -262,6 +292,12 @@ async def button_handler(update, context):
 
     user_id = query.from_user.id
     callback_data = query.data
+
+    # Обработка выхода
+    if callback_data == 'logout':
+        user_data.pop(user_id, None)  # Удаляем данные пользователя
+        await query.message.reply_text("Вы вышли из системы. Для входа используйте /start")
+        return
 
     # Обработка выбора роли (Ученик/Учитель)
     if callback_data in ['ученик', 'учитель']:
@@ -285,6 +321,19 @@ async def button_handler(update, context):
 
     else:
         await query.message.reply_text("Неизвестная команда.")
+
+async def class_grades(update, context):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if user_data[user_id]['role'] != 'учитель':
+        await query.message.reply_text("Эта команда доступна только учителям")
+        return
+
+    user_data[user_id]['state'] = 'waiting_for_class_name'
+    await query.message.reply_text("Введите название класса:")
+
 
 
 def main():

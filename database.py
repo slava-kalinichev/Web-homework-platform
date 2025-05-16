@@ -1,3 +1,4 @@
+import mysql.connector
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -242,7 +243,7 @@ def is_deadline_passed(deadline_unix):
     return datetime.now() > deadline_date
 
 
-def get_teacher_id_by_login(login):
+def get_teacher_id_by_login(login: str) -> int | None:
     """Получает ID учителя по логину"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
