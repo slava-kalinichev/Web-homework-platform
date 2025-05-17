@@ -4,6 +4,8 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from admin_only import CON_PASSWORD
+
 # Путь к базе данных
 DB_PATH = Path('lmsDataBase')
 
@@ -14,7 +16,7 @@ def get_db_connection():
         connection = mysql.connector.connect(
             host='slavakalinichev.mysql.pythonanywhere-services.com',
             user='slavakalinichev',
-            password='wsxwsx90S',
+            password=CON_PASSWORD,
             database='slavakalinichev$lmsDataBase'
         )
         return connection
@@ -1320,3 +1322,28 @@ def get_class_by_id_and_teacher(class_id, teacher_id):
             WHERE c.ClassID = %s AND (mc.TeacherID = %s OR tis.TeacherID = %s)
         ''', (class_id, teacher_id, teacher_id))
         return cursor.fetchone()
+
+
+def save_google_credentials(teacher_id, credentials):
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        try:
+            cursor = cnx.cursor()
+            cursor.execute('''
+                INSERT INTO TeacherGoogleCredentials (TeacherID, CredentialsJSON)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE CredentialsJSON = %s
+            ''', (teacher_id, credentials, credentials))
+            cnx.commit()
+            return True
+        except Exception as e:
+            print(f"Ошибка сохранения учетных данных: {str(e)}")
+            return False
+
+def get_google_credentials(teacher_id):
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute('SELECT CredentialsJSON FROM TeacherGoogleCredentials WHERE TeacherID = %s', (teacher_id,))
+        result = cursor.fetchone()
+        return result['CredentialsJSON'] if result else None
