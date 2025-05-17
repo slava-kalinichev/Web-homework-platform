@@ -78,16 +78,21 @@ def index():
             flash('Несуществующий логин', 'error')
         elif auth_result['status'] == 'wrong_password':
             flash('Неправильный пароль', 'error')
+        elif auth_result['status'] == 'not connected':
+            flash('Нет подключения к БД', 'error')
         else:
             flash('Ошибка авторизации', 'error')
 
     return render_template('index.html', title='Главная страница', form=loginForm)
 
 
+
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         try:
+            print('in register 1')
             data = request.get_json()
 
             # Проверка обязательных полей
@@ -99,6 +104,7 @@ def register():
                 }), 400
 
             # Регистрация пользователя
+            print('in register 2')
             user_id = register_user(
                 data['lastName'],
                 data['firstName'],
@@ -107,8 +113,11 @@ def register():
                 data['login'],
                 data['password']
             )
+            print('in register 3')
+            print(user_id)
 
             if not user_id:
+                print('in register not user id')
                 return jsonify({
                     'success': False,
                     'message': 'Ошибка регистрации. Логин уже занят.'
@@ -117,12 +126,14 @@ def register():
             # Для учителей - перенаправляем на дополнительную регистрацию
             if data['role'] == 'teacher':
                 session['new_teacher_id'] = user_id
+                print('in register - redirect to teacher')
                 return jsonify({
                     'success': True,
                     'redirect': url_for('register_teacher', teacher_id=user_id)
                 })
 
             # Для учеников - сразу авторизуем
+            print('in register - student')
             session['user_id'] = data['login']
             session['user_role'] = data['role']
             return jsonify({
@@ -131,11 +142,13 @@ def register():
             })
 
         except Exception as e:
+            print('in register - server error')
             return jsonify({
                 'success': False,
                 'message': f'Ошибка сервера: {str(e)}'
             }), 500
 
+    print('in register - ОК')
     return render_template('regNewAcc.html', title="Регистрация")
 
 
@@ -558,10 +571,13 @@ def student_task(user_id, task_id):
 @app.route('/check_student_login')
 def check_student_login():
     login = request.args.get('login')
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1 FROM Students WHERE Login = ?', (login,))
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute('SELECT 1 FROM Students WHERE Login = %s', (login,))
         exists = cursor.fetchone() is not None
+        cursor.close()
+        cnx.close()
     return jsonify({'exists': exists})
 
 
@@ -598,11 +614,10 @@ def teacher_task_statistics(user_id, task_id):
         flash('Задание не найдено', 'error')
         return redirect(url_for('mainTeacher', user_id=user_id))
 
-    # Статистика выполнения
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
 
-        # Получаем всех студентов класса
         cursor.execute('''
             SELECT 
                 s.StudentID,
@@ -620,17 +635,19 @@ def teacher_task_statistics(user_id, task_id):
             JOIN Accounts a ON s.Login = a.Login
             JOIN StudentInClasses sc ON s.StudentID = sc.StudentID
             JOIN Classes c ON sc.ClassID = c.ClassID
-            LEFT JOIN StudentTasks st ON st.StudentID = s.StudentID AND st.TaskID = ?
-            WHERE c.ClassTitle = ?
+            LEFT JOIN StudentTasks st ON st.StudentID = s.StudentID AND st.TaskID = %s
+            WHERE c.ClassTitle = %s
             ORDER BY s.LastName, s.FirstName
         ''', (task_id, task['class_name']))
         students = cursor.fetchall()
 
-        # Считаем статистику
         total = len(students)
         completed = sum(1 for s in students if s['status'] == 'completed')
         failed = sum(1 for s in students if s['status'] == 'failed')
         not_submitted = sum(1 for s in students if s['status'] == 'not_submitted')
+
+        cursor.close()
+        cnx.close()
 
     return render_template('teacher_task_statistics.html',
                            title=f'Статистика выполнения {task["subject"]} - {task["theme"]}',
@@ -655,42 +672,42 @@ def student_data(user_id):
         flash('Пользователь не найден', 'error')
         return redirect(url_for('index'))
 
-    # Получаем данные ученика
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
         cursor.execute('''
             SELECT s.StudentID, s.LastName, s.FirstName, s.MiddleName, a.Login, a.SecretPass as password
             FROM Students s
             JOIN Accounts a ON s.Login = a.Login
-            WHERE s.Login = ?
+            WHERE s.Login = %s
         ''', (user_id,))
         student_data = cursor.fetchone()
 
-        # Получаем класс ученика
         cursor.execute('''
             SELECT c.ClassTitle 
             FROM StudentInClasses sc
             JOIN Classes c ON sc.ClassID = c.ClassID
             JOIN ClassesInSchools cis ON c.ClassID = cis.ClassID
-            WHERE sc.StudentID = ?
+            WHERE sc.StudentID = %s
         ''', (student_data['StudentID'],))
         school_class = cursor.fetchone()
 
-        # Получаем "мои" классы
         cursor.execute('''
             SELECT c.ClassTitle 
             FROM StudentInClasses sc
             JOIN Classes c ON sc.ClassID = c.ClassID
             JOIN MyClasses mc ON c.ClassID = mc.ClassID
-            WHERE sc.StudentID = ? AND NOT EXISTS (
+            WHERE sc.StudentID = %s AND NOT EXISTS (
                 SELECT 1 FROM ClassesInSchools cis 
                 WHERE cis.ClassID = c.ClassID
             )
         ''', (student_data['StudentID'],))
         my_classes = cursor.fetchall()
 
-        # Получаем статистику ученика
         stats = get_student_statistics(student_data['StudentID'])
+
+        cursor.close()
+        cnx.close()
 
         return render_template('student_data.html',
                            student=student_data,
@@ -745,13 +762,16 @@ def register_teacher():
 
         # Сохраняем связь учитель-школа
         if school_id:
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
+            cnx = get_db_connection()
+            if cnx and cnx.is_connected():
+                cursor = cnx.cursor()
                 cursor.execute('''
-                    INSERT INTO TeachersInSchools (SchoolID, TeacherID)
-                    VALUES (?, ?)
-                ''', (school_id, teacher_id))
-                conn.commit()
+                                INSERT INTO TeachersInSchools (SchoolID, TeacherID)
+                                VALUES (%s, %s)
+                            ''', (school_id, teacher_id))
+                cnx.commit()
+                cursor.close()
+                cnx.close()
 
         # флаг доступа в сессии
         session['teacher_access_type'] = access_type
@@ -800,44 +820,51 @@ def check_student_for_class():
     class_id = request.args.get('class_id')
     is_school = request.args.get('is_school', '').lower() == 'true'
 
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
 
-        # Проверяем существует ли ученик
-        cursor.execute('SELECT StudentID FROM Students WHERE Login = ?', (login,))
+        cursor.execute('SELECT StudentID FROM Students WHERE Login = %s', (login,))
         student = cursor.fetchone()
 
         if not student:
+            cursor.close()
+            cnx.close()
             return jsonify({
                 'can_add': False,
                 'message': 'Ученик с таким логином не найден'
             })
 
-        # Проверяем не состоит ли уже в этом классе
         cursor.execute('''
             SELECT 1 FROM StudentInClasses 
-            WHERE ClassID = ? AND StudentID = ?
+            WHERE ClassID = %s AND StudentID = %s
         ''', (class_id, student['StudentID']))
 
         if cursor.fetchone():
+            cursor.close()
+            cnx.close()
             return jsonify({
                 'can_add': False,
                 'message': 'Ученик уже состоит в этом классе'
             })
 
-        # Для школьных классов проверяем не состоит ли в другом школьном классе
         if is_school:
             cursor.execute('''
                 SELECT 1 FROM StudentInClasses sc
                 JOIN ClassesInSchools cis ON sc.ClassID = cis.ClassID
-                WHERE sc.StudentID = ? AND sc.ClassID != ?
+                WHERE sc.StudentID = %s AND sc.ClassID != %s
             ''', (student['StudentID'], class_id))
 
             if cursor.fetchone():
+                cursor.close()
+                cnx.close()
                 return jsonify({
                     'can_add': False,
                     'message': 'Ученик уже состоит в другом школьном классе'
                 })
+
+        cursor.close()
+        cnx.close()
 
     return jsonify({
         'can_add': True,
@@ -861,13 +888,16 @@ def send_invitation(user_id, class_name):
         return jsonify({'success': False, 'message': 'Учитель не найден'})
 
     # Получаем имя ученика для сообщения
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
         cursor.execute('''
             SELECT LastName, FirstName FROM Students 
-            WHERE Login = ?
+            WHERE Login = %s
         ''', (student_login,))
         student = cursor.fetchone()
+        cursor.close()
+        cnx.close()
 
     if not student:
         return jsonify({'success': False, 'message': 'Ученик не найден'})
@@ -960,9 +990,9 @@ def leave_class(user_id, class_name):
 
     return redirect(url_for('student_data', user_id=user_id))
 
+
 @app.route('/download_task_file/<int:task_id>')
 def download_task_file(task_id):
-    # Скачивание прикрепленного файла решения
     if 'user_id' not in session:
         flash('Сессия завершена', 'error')
         return redirect(url_for('index'))
@@ -977,10 +1007,10 @@ def download_task_file(task_id):
     response.headers['Content-Disposition'] = f'attachment; filename={file_data["FileName"]}'
     return response
 
+
 @app.route('/download_solution_file/<int:stid>')
 def download_solution_file(stid):
-    # Скачивание прикрепленного файла решения
-    if 'user_id' not in session or session['user_role'] != 'teacher':
+    if 'user_id' not in session:
         flash('Сессия завершена', 'error')
         return redirect(url_for('index'))
 
