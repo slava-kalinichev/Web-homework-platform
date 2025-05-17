@@ -2,7 +2,11 @@ from flask import (Flask, render_template, flash, redirect, url_for,
                    request, session, jsonify, make_response)
 from googleapiclient import discovery
 from google.oauth2 import service_account
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+import requests
 import datetime
+import json
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -10,43 +14,60 @@ from wtforms.validators import DataRequired
 from database import *
 import os
 import re
+from admin_only import *
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
 
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 calendarId = 'viacheslavkalinichev@gmail.com'
 SERVICE_ACCOUNT_FILE = 'slava-lms-761d02a60026.json'
 
+app.config['GOOGLE_OAUTH_CLIENT_ID'] = GOOGLE_OAUTH_CLIENT_ID
+app.config['GOOGLE_OAUTH_CLIENT_SECRET'] = GOOGLE_OAUTH_CLIENT_SECRET
+app.config['GOOGLE_OAUTH_REDIRECT_URI'] = 'https://slavakalinichev.pythonanywhere.com/oauth2callback'
+app.config['GOOGLE_OAUTH_SCOPES'] = ['https://www.googleapis.com/auth/calendar.readonly']
 
-class GoogleCalendar(object):
-    def __init__(self):
-        credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        self.service = discovery.build('calendar', 'v3', credentials=credentials)
+
+class GoogleCalendar:
+    def __init__(self, credentials=None):
+        self.credentials = None
+        if credentials:
+            if isinstance(credentials, str):
+                credentials = json.loads(credentials)
+            self.credentials = Credentials.from_authorized_user_info(credentials)
+        self.service = None
 
     def get_next_class_event(self, class_name):
+        if not self.credentials or not self.credentials.valid:
+            if self.credentials and self.credentials.expired and self.credentials.refresh_token:
+                self.credentials.refresh(Request())
+            else:
+                return None
+
+        if not self.service:
+            self.service = discovery.build('calendar', 'v3', credentials=self.credentials)
+
         now = datetime.utcnow().isoformat() + 'Z'
-        t_max = (datetime.utcnow() + timedelta(days=7)).isoformat() + 'Z'
+        t_max = (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'  # Увеличим период поиска до 30 дней
 
-        # Ищем события с названием "Урок с [название класса]"
         query = f'Урок с {class_name}'
+        try:
+            events_result = self.service.events().list(
+                calendarId='primary',
+                timeMin=now,
+                timeMax=t_max,
+                q=query,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
 
-        events_result = self.service.events().list(
-            calendarId=calendarId,
-            timeMin=now,
-            timeMax=t_max,
-            q=query,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-
-        events = events_result.get('items', [])
-
-        if not events:
+            events = events_result.get('items', [])
+            return events[0] if events else None
+        except Exception as e:
+            print(f"Ошибка при запросе к Google Calendar API: {str(e)}")
             return None
-
-        # Возвращаем ближайшее событие
-        return events[0]
 
 
 # Форма входа в приложение
@@ -179,6 +200,11 @@ def mainTeacher(user_id):
     tasks = get_tasks_with_pending_solutions(teacher_id)
     # Получаем статус последней обработанной заявки (если есть)
     last_invitation_status = session.pop('last_invitation_status', None)
+    # Проверяем наличие сохраненных учетных данных Google
+    has_google_auth = get_teacher_google_credentials(teacher_id) is not None
+    google_account_email = None
+    if has_google_auth:
+        google_account_email = get_google_account_email(teacher_id)
 
     return render_template('mainTeacher.html',
                            title='Личный кабинет учителя',
@@ -190,7 +216,9 @@ def mainTeacher(user_id):
                            tasks=tasks,
                            school_name=school_name,
                            is_school_teacher=is_school_teacher,
-                           last_invitation_status=last_invitation_status)
+                           last_invitation_status=last_invitation_status,
+                           has_google_auth=has_google_auth,
+                           google_account_email=google_account_email)
 
 
 @app.route('/mainStudent/<user_id>')
@@ -1052,20 +1080,122 @@ def get_next_class_date(user_id):
     if not class_name:
         return jsonify({'success': False, 'message': 'Выберите класс'})
 
-    calendar = GoogleCalendar()
-    event = calendar.get_next_class_event(class_name)
+    teacher_id = get_teacher_id_by_login(user_id)
+    if not teacher_id:
+        return jsonify({'success': False, 'message': 'Учитель не найден'})
 
-    if not event:
-        return jsonify({'success': False, 'message': f'В ближайшее время нет уроков с {class_name}'})
+    credentials_json = get_teacher_google_credentials(teacher_id)
+    if not credentials_json:
+        return jsonify({
+            'success': False,
+            'message': 'Требуется авторизация в Google Calendar',
+            'needs_auth': True
+        })
 
-    # Извлекаем дату из события и форматируем её
-    start_date = event['start'].get('dateTime', event['start'].get('date'))
-    event_date = datetime.fromisoformat(start_date).date()
+    try:
+        calendar = GoogleCalendar(credentials_json)
+        event = calendar.get_next_class_event(class_name)
 
-    return jsonify({
-        'success': True,
-        'date': event_date.isoformat()
-    })
+        if not event:
+            return jsonify({'success': False, 'message': f'В ближайшие 30 дней нет уроков с {class_name}'})
+
+        start_date = event['start'].get('dateTime', event['start'].get('date'))
+        if not start_date:
+            return jsonify({'success': False, 'message': 'Не удалось получить дату урока'})
+
+        event_date = datetime.fromisoformat(start_date).date()
+        return jsonify({
+            'success': True,
+            'date': event_date.isoformat()
+        })
+    except Exception as e:
+        print(f"Ошибка при получении даты урока: {str(e)}")
+        return jsonify({'success': False, 'message': 'Ошибка при получении даты урока'})
+
+
+@app.route('/revoke_google_auth/<user_id>')
+def revoke_google_auth(user_id):
+    if 'user_id' not in session or session['user_id'] != user_id:
+        return redirect(url_for('index'))
+
+    teacher_id = get_teacher_id_by_login(user_id)
+    if teacher_id:
+        cnx = get_db_connection()
+        if cnx and cnx.is_connected():
+            cursor = cnx.cursor()
+            cursor.execute('DELETE FROM TeacherGoogleCredentials WHERE TeacherID = %s', (teacher_id,))
+            cnx.commit()
+            cursor.close()
+            cnx.close()
+
+    flash('Доступ к Google Calendar отключен', 'success')
+    return redirect(url_for('mainTeacher', user_id=user_id))
+
+
+@app.route('/start_oauth/<user_id>')
+def start_oauth(user_id):
+    if 'user_id' not in session or session['user_id'] != user_id:
+        return redirect(url_for('index'))
+
+    # Сохраняем URL, куда вернуться после авторизации
+    session['oauth_redirect'] = url_for('new_task', user_id=user_id)
+
+    auth_url = (
+        f"https://accounts.google.com/o/oauth2/auth?"
+        f"client_id={app.config['GOOGLE_OAUTH_CLIENT_ID']}&"
+        f"redirect_uri={app.config['GOOGLE_OAUTH_REDIRECT_URI']}&"
+        f"scope={'+'.join(app.config['GOOGLE_OAUTH_SCOPES'])}&"
+        f"response_type=code&"
+        f"access_type=offline&"
+        f"prompt=consent&"  # Добавляем prompt=consent для получения refresh token
+        f"state={user_id}"
+    )
+
+    return redirect(auth_url)
+
+
+@app.route('/oauth2callback')
+def oauth2callback():
+    code = request.args.get('code')
+    user_id = request.args.get('state')
+
+    if not code or not user_id:
+        return redirect(url_for('index'))
+
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        'code': code,
+        'client_id': app.config['GOOGLE_OAUTH_CLIENT_ID'],
+        'client_secret': app.config['GOOGLE_OAUTH_CLIENT_SECRET'],
+        'redirect_uri': app.config['GOOGLE_OAUTH_REDIRECT_URI'],
+        'grant_type': 'authorization_code'
+    }
+
+    try:
+        response = requests.post(token_url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+
+        credentials = {
+            'token': token_data['access_token'],
+            'refresh_token': token_data.get('refresh_token'),
+            'token_uri': token_url,
+            'client_id': app.config['GOOGLE_OAUTH_CLIENT_ID'],
+            'client_secret': app.config['GOOGLE_OAUTH_CLIENT_SECRET'],
+            'scopes': app.config['GOOGLE_OAUTH_SCOPES']
+        }
+
+        # Сохраняем credentials в базе данных
+        teacher_id = get_teacher_id_by_login(user_id)
+        if teacher_id:
+            save_google_credentials(teacher_id, json.dumps(credentials))
+
+        redirect_url = session.pop('oauth_redirect', url_for('mainTeacher', user_id=user_id))
+        return redirect(redirect_url)
+    except Exception as e:
+        print(f"Ошибка при получении токена: {str(e)}")
+        flash('Ошибка авторизации Google', 'error')
+        return redirect(url_for('mainTeacher', user_id=user_id))
 
 if __name__ == '__main__':
     app.run(port=8080, host='127.0.0.1')

@@ -151,9 +151,6 @@
         }
 
         .logout-btn {
-            position: absolute;
-            top: 30px;
-            right: 30px;
             background: rgba(120, 120, 130, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 10px;
@@ -163,6 +160,10 @@
             cursor: pointer;
             transition: all 0.3s;
             text-decoration: none;
+            display: inline-block;
+            height: 40px;
+            box-sizing: border-box;
+            line-height: 20px;
         }
 
         .logout-btn:hover {
@@ -445,6 +446,68 @@
         .school-classes-header:hover {
             color: #c2e4ff;
         }
+        /* Общий контейнер для элементов управления */
+        .account-controls {
+            display: flex;
+            align-items: center;
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            gap: 20px;
+        }
+
+        /* Стили для Google аккаунта */
+        .google-account-wrapper {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+
+        .google-account {
+            display: flex;
+            align-items: center;
+            background: rgba(66, 133, 244, 0.2);
+            border-radius: 10px;
+            padding: 10px 15px;
+            height: 40px;
+            box-sizing: border-box;
+        }
+
+        .google-account-email {
+            margin-right: 10px;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+            font-size: 14px;
+            line-height: 20px;
+        }
+
+        .google-account-remove {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            transition: background-color 0.3s;
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .google-account-remove:hover {
+            background-color: rgba(255, 107, 107, 0.2);
+        }
+
+        .google-account-remove svg {
+            width: 12px;
+            height: 12px;
+        }
     </style>
 </head>
 <body>
@@ -457,7 +520,22 @@
     </div>
 
     <div class="glass-panel">
-        <a href="/index" class="logout-btn">Выйти</a>
+        <div class="account-controls">
+            {% if has_google_auth %}
+            <div class="google-account-wrapper">
+                <div class="google-account">
+                    <span class="google-account-email">Google Calendar: привязан</span>
+                    <button class="google-account-remove" onclick="revokeGoogleAuth()" title="Отвязать Google аккаунт">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+            <a href="/index" class="logout-btn">Выйти</a>
+        </div>
 
         <h1>Учитель: {{ userName }}</h1>
         <h3>Добро пожаловать в Smartable LMS!</h3>
@@ -1081,6 +1159,30 @@
 
             modal.style.display = 'none';
         });
+        function revokeGoogleAuth() {
+            if (confirm('Вы действительно хотите отвязать Google аккаунт? Автоматическое определение дат уроков будет недоступно.')) {
+                const googleAccount = document.querySelector('.google-account-wrapper');
+                googleAccount.style.opacity = '0';
+                googleAccount.style.transition = 'opacity 0.3s ease';
+
+                fetch(`/revoke_google_auth/{{ user_id }}`, {
+                    method: 'GET'
+                }).then(response => {
+                    if (response.ok) {
+                        setTimeout(() => {
+                            googleAccount.remove();
+                        }, 300);
+                    } else {
+                        googleAccount.style.opacity = '1';
+                        alert('Ошибка при отвязке Google аккаунта');
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                    googleAccount.style.opacity = '1';
+                    alert('Ошибка при отвязке Google аккаунта');
+                });
+            }
+        }
     </script>
 </body>
 </html>

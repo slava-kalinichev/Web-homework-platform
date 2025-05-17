@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import errorcode
 import os
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1324,7 +1325,17 @@ def get_class_by_id_and_teacher(class_id, teacher_id):
         return cursor.fetchone()
 
 
+def get_teacher_google_credentials(teacher_id):
+    """Получает учетные данные Google учителя"""
+    cnx = get_db_connection()
+    if cnx and cnx.is_connected():
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute('SELECT CredentialsJSON FROM TeacherGoogleCredentials WHERE TeacherID = %s', (teacher_id,))
+        result = cursor.fetchone()
+        return result['CredentialsJSON'] if result else None
+
 def save_google_credentials(teacher_id, credentials):
+    """Сохраняет учетные данные Google учителя"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         try:
@@ -1340,10 +1351,23 @@ def save_google_credentials(teacher_id, credentials):
             print(f"Ошибка сохранения учетных данных: {str(e)}")
             return False
 
-def get_google_credentials(teacher_id):
+
+def get_google_account_email(teacher_id):
+    """Получает email из сохраненных Google credentials"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         cursor = cnx.cursor(dictionary=True)
         cursor.execute('SELECT CredentialsJSON FROM TeacherGoogleCredentials WHERE TeacherID = %s', (teacher_id,))
         result = cursor.fetchone()
-        return result['CredentialsJSON'] if result else None
+        if result:
+            try:
+                credentials = json.loads(result['CredentialsJSON'])
+                # Получаем email из токена
+                id_token = credentials.get('id_token')
+                if id_token:
+                    import jwt
+                    decoded = jwt.decode(id_token, options={"verify_signature": False})
+                    return decoded.get('email')
+            except Exception as e:
+                print(f"Ошибка при получении email из credentials: {str(e)}")
+        return None

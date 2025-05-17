@@ -218,6 +218,19 @@
     #autoDeadlineBtn:hover {
         background: rgba(94, 92, 230, 0.5);
     }
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
     </style>
 </head>
 <body>
@@ -358,6 +371,12 @@
                 return;
             }
 
+            // Показываем индикатор загрузки
+            const button = this;
+            const originalText = button.textContent;
+            button.innerHTML = '<span class="spinner"></span> Загрузка...';
+            button.disabled = true;
+
             fetch(`/get_next_class_date/{{ user_id }}`, {
                 method: 'POST',
                 headers: {
@@ -371,13 +390,22 @@
             .then(data => {
                 if (data.success) {
                     document.getElementById('deadline').value = data.date;
+                } else if (data.needs_auth) {
+                    if (confirm('Для автоматического определения дедлайна необходимо авторизоваться в Google Calendar. Перейти к авторизации?')) {
+                        window.location.href = `/start_oauth/{{ user_id }}`;
+                    }
                 } else {
-                    alert(data.message);
+                    alert(data.message || 'Не удалось получить дату урока');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Произошла ошибка при получении даты урока');
+                alert('Произошла ошибка при подключении к серверу');
+            })
+            .finally(() => {
+                // Восстанавливаем кнопку
+                button.textContent = originalText;
+                button.disabled = false;
             });
         });
     </script>
