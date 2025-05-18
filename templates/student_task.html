@@ -291,7 +291,7 @@
                     {{ task.text }}
                 </div>
 
-                {% if task_file %}
+                {% if task.has_file %}
                 <div class="task-file" style="margin: 20px 0;">
                     <div class="task-text-header">Прикрепленный файл:</div>
                     <a href="{{ url_for('download_task_file', task_id=task.id) }}"
@@ -302,7 +302,7 @@
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        {{ task_file.FileName }}
+                        {{ task.file_name }}
                     </a>
                 </div>
                 {% endif %}
@@ -324,20 +324,6 @@
                             </button>
                         </div>
                     </div>
-
-                    {% if solution and solution.has_file %}
-                    <div class="solution-file">
-                        <span>Прикрепленный файл:</span>
-                        <a href="{{ url_for('download_solution_file', stid=solution.stid) }}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            {{ solution.file_name }}
-                        </a>
-                    </div>
-                    {% endif %}
 
                     <div class="submit-container">
                         <div class="button-group">
@@ -431,13 +417,12 @@
                     return false;
                 }
 
-                // Добавляем приписку о файле, если он прикреплен
-                if (fileInput.files[0]) {
-                    const currentText = solutionText.value;
-                    if (!currentText.includes('(прикреплён файл)')) {
-                        solutionText.value = currentText + ' (прикреплён файл)';
-                    }
+                // Подтверждение для повторной отправки
+                {% if is_submitted %}
+                if (!confirm('Вы уверены, что хотите заменить текущее решение?')) {
+                    return false;
                 }
+                {% endif %}
 
                 // Блокируем кнопку и меняем текст
                 submitBtn.disabled = true;

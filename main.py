@@ -581,7 +581,6 @@ def student_task(user_id, task_id):
             mime_type = file.mimetype
 
         if submit_solution(user_info['id'], task_id, solution_text, file_data, filename, mime_type):
-            flash('Решение успешно отправлено!', 'success')
             return redirect(url_for('student_task', user_id=user_id, task_id=task_id))
         else:
             flash('Ошибка при отправке решения', 'error')

@@ -183,9 +183,9 @@
                 <div class="solution-text">
                     <strong>Решение ученика:</strong>
                     <p>{{ solution.text }}</p>
-                    {% if has_file %}
+                    {% if solution.has_file %}
                     <div style="margin-top: 15px;">
-                        <a href="{{ url_for('download_solution_file', stid=solution_stid) }}"
+                        <a href="{{ url_for('download_solution_file', stid=solution.stid) }}"
                            class="btn-vision"
                            style="display: inline-flex; align-items: center; gap: 8px;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

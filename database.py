@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import errorcode
 import os
+import uuid
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -294,61 +295,76 @@ def get_teacher_id_by_login(login: str) -> int | None:
 
 
 def submit_solution(student_id, task_id, solution_text, file_data=None, filename=None, mime_type=None):
-    """Обновляет или создает решение задания"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         try:
             current_time = int(datetime.now().timestamp())
 
-            # Проверяем дедлайн
-            curs = cnx.cursor(dictionary=True)
-            curs.execute('SELECT Date FROM Tasks WHERE TaskID = %s', (task_id,))
-            task = curs.fetchone()
-            if task and datetime.now().timestamp() > task['Date']:
-                return False  # Дедлайн прошел
-
             # Проверяем существующее решение
-            curs.execute('''
+            cursor = cnx.cursor(dictionary=True)
+            cursor.execute('''
                 SELECT STID FROM StudentTasks
                 WHERE StudentID = %s AND TaskID = %s
             ''', (student_id, task_id))
-            exists = curs.fetchone()
+            existing_solution = cursor.fetchone()
 
-            if exists:
-                # Обновляем существующее решение
-                curs.execute('''
-                    UPDATE StudentTasks SET
-                        Decision = %s,
-                        Status = 'submitted',
-                        Mark = NULL,
-                        Comment = NULL,
-                        DispatchDT = %s
-                    WHERE StudentID = %s AND TaskID = %s
-                ''', (solution_text, current_time, student_id, task_id))
-                stid = exists['STID']
+            # Если решение уже существует - удаляем его с файлом
+            if existing_solution:
+                stid = existing_solution['STID']
 
-                # Удаляем старый файл, если есть
-                curs.execute('DELETE FROM SolutionFiles WHERE STID = %s', (stid,))
-            else:
-                # Создаем новое решение
-                curs.execute('''
-                    INSERT INTO StudentTasks
-                    (StudentID, TaskID, Decision, Status, DispatchDT)
-                    VALUES (%s, %s, %s, 'submitted', %s)
-                ''', (student_id, task_id, solution_text, current_time))
-                stid = curs.lastrowid
+                # Удаляем файл решения с диска (если есть)
+                cursor.execute('''
+                    SELECT FilePath FROM SolutionFiles
+                    WHERE STID = %s
+                ''', (stid,))
+                file_info = cursor.fetchone()
+                if file_info:
+                    file_path = os.path.expanduser(f'~/lms_files/solution_files/{file_info["FilePath"]}')
+                    try:
+                        os.remove(file_path)
+                    except FileNotFoundError:
+                        pass
 
-            # Сохраняем файл (убедитесь, что file_data - это bytes)
+                # Удаляем записи из БД
+                cursor.execute('DELETE FROM SolutionFiles WHERE STID = %s', (stid,))
+                cursor.execute('DELETE FROM StudentTasks WHERE STID = %s', (stid,))
+
+            # Добавляем приписку о файле, если он есть
             if file_data and filename:
-                curs.execute('''
-                    INSERT INTO SolutionFiles (STID, FileName, FileData, MimeType)
+                solution_text_with_file = f"{solution_text} (прикреплен файл)"
+            else:
+                solution_text_with_file = solution_text
+
+            # Создаем новую запись о решении
+            cursor.execute('''
+                INSERT INTO StudentTasks
+                (StudentID, TaskID, Decision, Status, DispatchDT)
+                VALUES (%s, %s, %s, 'submitted', %s)
+            ''', (student_id, task_id, solution_text_with_file, current_time))
+            stid = cursor.lastrowid
+
+            # Если есть файл - сохраняем его
+            if file_data and filename:
+                UPLOAD_FOLDER = os.path.expanduser('~/lms_files/solution_files')
+                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+                file_ext = os.path.splitext(filename)[1]
+                unique_filename = f"{uuid.uuid4()}{file_ext}"
+                file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+                with open(file_path, 'wb') as f:
+                    f.write(file_data)
+
+                cursor.execute('''
+                    INSERT INTO SolutionFiles (STID, FileName, FilePath, MimeType)
                     VALUES (%s, %s, %s, %s)
-                ''', (stid, filename, file_data, mime_type))
+                ''', (stid, filename, unique_filename, mime_type))
 
             cnx.commit()
             return True
         except Exception as e:
             print(f"Ошибка при отправке решения: {str(e)}")
+            cnx.rollback()
             return False
 
 
@@ -376,7 +392,6 @@ def grade_solution_func(student_id, task_id, grade, comment):
 
 
 def get_task_details(task_id):
-    """Получает детали задания с корректным дедлайном"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         cursor = cnx.cursor(dictionary=True)
@@ -389,13 +404,18 @@ def get_task_details(task_id):
                 t.Date as deadline_unix,
                 (SELECT CONCAT(te.LastName, ' ', te.FirstName, ' ', te.MiddleName)
                  FROM Teachers te WHERE te.TeacherID = t.TeacherID) as teacher,
-                c.ClassTitle as class_name
+                c.ClassTitle as class_name,
+                tf.FileName as file_name,
+                tf.FilePath as file_path,
+                tf.MimeType as mime_type
             FROM Tasks t
             JOIN Subjects s ON t.SubjectID = s.SubjectID
             JOIN Classes c ON t.ClassID = c.ClassID
+            LEFT JOIN TaskFiles tf ON t.TaskID = tf.TaskID
             WHERE t.TaskID = %s
         ''', (task_id,))
         task = cursor.fetchone()
+
         if task:
             task = dict(task)
             try:
@@ -404,15 +424,18 @@ def get_task_details(task_id):
             except:
                 task['deadline'] = "Нет даты"
 
-            # Получаем информацию о файле
-            cursor.execute('''
-                SELECT FileName 
-                FROM TaskFiles 
-                WHERE TaskID = %s
-            ''', (task_id,))
-            file_info = cursor.fetchone()
-            if file_info:
-                task['file'] = dict(file_info)
+            # Информация о наличии прикрепленного файла
+            if task['file_path']:
+                task['has_file'] = True
+                try:
+                    file_path = os.path.expanduser(f'~/lms_files/task_files/{task["file_path"]}')
+                    with open(file_path, 'rb') as f:
+                        task['file_data'] = f.read()
+                except FileNotFoundError:
+                    task['has_file'] = False
+            else:
+                task['has_file'] = False
+
         return task
 
 
@@ -556,7 +579,6 @@ def get_student_statistics(student_id):
 
 
 def get_solution_details(task_id, student_id):
-    """Получает детали решения"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         cursor = cnx.cursor(dictionary=True)
@@ -567,13 +589,23 @@ def get_solution_details(task_id, student_id):
                 st.Decision as text,
                 st.Mark as grade,
                 st.Comment as comment,
-                FROM_UNIXTIME(t.Date - 24*60*60, '%d.%m.%Y') as submission_date
+                FROM_UNIXTIME(st.DispatchDT) as submission_date,
+                st.STID as stid,
+                sf.FileName as file_name,
+                sf.FilePath as file_path
             FROM StudentTasks st
             JOIN Students s ON st.StudentID = s.StudentID
             JOIN Tasks t ON st.TaskID = t.TaskID
+            LEFT JOIN SolutionFiles sf ON st.STID = sf.STID
             WHERE st.TaskID = %s AND st.StudentID = %s
         ''', (task_id, student_id))
-        return cursor.fetchone()
+        solution = cursor.fetchone()
+
+        if solution:
+            solution = dict(solution)
+            solution['has_file'] = bool(solution.get('file_path'))
+
+        return solution
 
 
 def get_student_tasks(student_id):
@@ -691,17 +723,63 @@ def get_tasks_with_pending_solutions(teacher_id):
 
 
 def delete_task_func(task_id):
-    """Удаляет задание и все связанные решения"""
+    """Удаляет задание и все связанные решения и файлы"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         try:
             cursor = cnx.cursor(dictionary=True)
-            # Сначала удаляям решения
+
+            # 1. Получаем все файлы решений для этого задания
+            cursor.execute('''
+                SELECT sf.FilePath 
+                FROM SolutionFiles sf
+                JOIN StudentTasks st ON sf.STID = st.STID
+                WHERE st.TaskID = %s
+            ''', (task_id,))
+            solution_files = cursor.fetchall()
+
+            # 2. Получаем файл задания (если есть)
+            cursor.execute('SELECT FilePath FROM TaskFiles WHERE TaskID = %s', (task_id,))
+            task_file = cursor.fetchone()
+
+            # 3. Удаляем записи о решениях и файлах из БД
+            cursor.execute('''
+                DELETE sf FROM SolutionFiles sf
+                JOIN StudentTasks st ON sf.STID = st.STID
+                WHERE st.TaskID = %s
+            ''', (task_id,))
+
             cursor.execute('DELETE FROM StudentTasks WHERE TaskID = %s', (task_id,))
-            # Затем удаляем само задание
+            cursor.execute('DELETE FROM TaskFiles WHERE TaskID = %s', (task_id,))
+
+            # 4. Удаляем само задание
             cursor.execute('DELETE FROM Tasks WHERE TaskID = %s', (task_id,))
+
             cnx.commit()
-            return cursor.rowcount > 0
+
+            # 5. Удаляем файлы с диска
+            UPLOAD_FOLDER_TASKS = os.path.expanduser('~/lms_files/task_files')
+            UPLOAD_FOLDER_SOLUTIONS = os.path.expanduser('~/lms_files/solution_files')
+
+            # Удаляем файл задания
+            if task_file:
+                try:
+                    file_path = os.path.join(UPLOAD_FOLDER_TASKS, task_file['FilePath'])
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"Ошибка при удалении файла задания: {str(e)}")
+
+            # Удаляем файлы решений
+            for file in solution_files:
+                try:
+                    file_path = os.path.join(UPLOAD_FOLDER_SOLUTIONS, file['FilePath'])
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"Ошибка при удалении файла решения: {str(e)}")
+
+            return True
         except mysql.connector.Error as e:
             print(f"Ошибка при удалении задания: {e}")
             cnx.rollback()
@@ -1103,44 +1181,38 @@ def get_student_class_stats(student_id, class_id):
             'average_grade': float(stats['average_grade']) if stats['average_grade'] is not None else 0
         }
 
+
 def create_task_with_file(subject_title, theme, teacher_id, class_id, deadline,
-                        task_text, file_data, filename, mime_type):
-    """Создает новое задание с прикрепленным файлом"""
+                          task_text, file_data, filename, mime_type):
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         try:
-            cursor = cnx.cursor(dictionary=True)
+            # Добавляем приписку о файле к тексту задания
+            task_text_with_file = f"{task_text} (прикреплен файл)"
 
-            # Получаем или создаем subject
-            cursor.execute('SELECT SubjectID FROM Subjects WHERE SubjectTitle = %s', (subject_title,))
-            subject = cursor.fetchone()
+            # Создаем задание с обновленным текстом
+            task_id = create_task(subject_title, theme, teacher_id, class_id,
+                                  deadline, task_text_with_file)
+            if not task_id:
+                return None
 
-            if not subject:
-                cursor.execute('INSERT INTO Subjects (SubjectTitle) VALUES (%s)', (subject_title,))
-                subject_id = cursor.lastrowid
-            else:
-                subject_id = subject['SubjectID']
+            # Сохраняем файл (остальной код без изменений)
+            UPLOAD_FOLDER = os.path.expanduser('~/lms_files/task_files')
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+            file_ext = os.path.splitext(filename)[1]
+            unique_filename = f"{uuid.uuid4()}{file_ext}"
+            file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
 
-            # Преобразуем дату из формата YYYY-MM-DD в Unix timestamp
-            deadline_date = datetime.strptime(deadline, '%Y-%m-%d')
-            unix_timestamp = int(deadline_date.timestamp())
+            with open(file_path, 'wb') as f:
+                f.write(file_data)
 
-            # Создаем задание
+            cursor = cnx.cursor()
             cursor.execute('''
-                INSERT INTO Tasks (Date, ClassID, TeacherID, SubjectID, Topic, Text)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (unix_timestamp, class_id, teacher_id, subject_id, theme, task_text))
-
-            task_id = cursor.lastrowid
-
-            # Сохраняем файл (убедитесь, что file_data - это bytes)
-            if file_data and filename:
-                cursor.execute('''
-                    INSERT INTO TaskFiles (TaskID, FileName, FileData, MimeType)
-                    VALUES (%s, %s, %s, %s)
-                ''', (task_id, filename, file_data, mime_type))
-
+                INSERT INTO TaskFiles (TaskID, FileName, FilePath, MimeType)
+                VALUES (%s, %s, %s, %s)
+            ''', (task_id, filename, unique_filename, mime_type))
             cnx.commit()
+
             return task_id
         except Exception as e:
             print(f"Ошибка создания задания с файлом: {str(e)}")
@@ -1149,44 +1221,52 @@ def create_task_with_file(subject_title, theme, teacher_id, class_id, deadline,
 
 
 def get_task_file(task_id):
-    """Получает прикрепленный файл задания"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         cursor = cnx.cursor(dictionary=True)
         cursor.execute('''
-            SELECT FileID, FileName, FileData, MimeType 
+            SELECT FileID, FileName, FilePath, MimeType 
             FROM TaskFiles 
             WHERE TaskID = %s
         ''', (task_id,))
-        return cursor.fetchone()
+        file_info = cursor.fetchone()
 
-def save_solution_file(stid, filename, file_data, mime_type):
-    """Сохраняет файл решения в базу данных"""
-    cnx = get_db_connection()
-    if cnx and cnx.is_connected():
-        try:
-            cursor = cnx.cursor(dictionary=True)
-            cursor.execute('''
-                INSERT INTO SolutionFiles (STID, FileName, FileData, MimeType)
-                VALUES (%s, %s, %s, %s)
-            ''', (stid, filename, file_data, mime_type))
-            cnx.commit()
-            return cursor.lastrowid
-        except mysql.connector.Error as e:
-            print(f"Ошибка сохранения файла решения: {e}")
-            return None
+        if file_info:
+            # Читаем файл с диска
+            file_path = os.path.expanduser(f'~/lms_files/task_files/{file_info["FilePath"]}')
+            try:
+                with open(file_path, 'rb') as f:
+                    file_info['FileData'] = f.read()
+                return file_info
+            except FileNotFoundError:
+                print(f"Файл не найден: {file_path}")
+                return None
+        return None
+
 
 def get_solution_file(stid):
-    """Получает файл решения по ID записи StudentTasks"""
     cnx = get_db_connection()
     if cnx and cnx.is_connected():
         cursor = cnx.cursor(dictionary=True)
         cursor.execute('''
-            SELECT FileID, FileName, FileData, MimeType 
+            SELECT FileID, FileName, FilePath, MimeType 
             FROM SolutionFiles 
             WHERE STID = %s
         ''', (stid,))
-        return cursor.fetchone()
+        file_info = cursor.fetchone()
+
+        if file_info:
+            # Читаем файл с диска
+            file_path = os.path.expanduser(f'~/lms_files/solution_files/{file_info["FilePath"]}')
+            try:
+                with open(file_path, 'rb') as f:
+                    file_data = f.read()
+                file_info['FileData'] = file_data
+                return file_info
+            except FileNotFoundError:
+                print(f"Файл не найден: {file_path}")
+                return None
+        return None
 
 def get_stid_by_solution(task_id, student_id):
     """Получает STID по ID задания и ID ученика"""
